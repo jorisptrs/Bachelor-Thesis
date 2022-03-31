@@ -1,23 +1,80 @@
-from cmath import inf
 from json.encoder import INFINITY
-from typing import no_type_check
+from math import floor
 import numpy as np
 
 import matplotlib.pyplot as plt
-from scipy import linalg, sparse, interpolate
+from scipy import linalg
+inv = linalg.inv
 
-# numpy.linalg is also an option for even fewer dependencies
+from lib.conceptors import *
+from lib.esn import ESN
 
-fig, ax = plt.subplots(4, 2)
+def shift(signal, phase):
+    for _ in range(phase):
+        signal = signal[-1] + signal[:-1]
+    return signal
+
+def ridge_regression(X, Y, reg_param):
+    """
+    Ridge regression solving W x = y
+    """
+    XTX = X.T @ X
+    return (np.linalg.inv(XTX + reg_param * np.eye(XTX.shape[0])) @ X.T @ Y).T
+
+#######################################
+
+
+# Evaluate
+
+class Plot:
+    def __init__(self):
+        self.ymax = 3
+        self.xmax = 3
+        self.fig, self.ax = plt.subplots(self.ymax,self.xmax)
+        self.cnt = 0
+
+    def add(self, y, label="No Label"):
+        y_idx = self.cnt % self.ymax
+        x_idx = int(floor(self.cnt / self.ymax))
+        self.ax[y_idx,x_idx].plot(y, label=label)
+        self.ax[y_idx,x_idx].legend()
+        if label == "Original C":
+            print("OG C", y_idx, x_idx)
+
+    def inc(self):
+        if self.cnt < self.xmax * self.ymax:
+            self.cnt += 1
+
+    def addNew(self, y, label="No Label"):
+        self.inc()
+        self.add(y, label)
+
+    def finalize(self, title="No Title"):
+        plot.fig.suptitle(title, fontsize=16)
+        plt.show()
+
+    def conceptors_fit_plot(self, X, Cs, label):
+        collection, _ = test(X, Cs, "PROP")
+        plot.inc()
+        for i, vals in enumerate(collection):
+            # walking average of d
+            d = 15
+            smoothed = np.convolve(np.array(vals), np.ones(d), 'valid') / d
+            plot.add(smoothed, label=label+str(i))
+
+def predict_correct():
+    for i, iterations in enumerate(assignments):
+        i = 0
+        original_perf += mean_fit(X_regen[:,i:i+iterations], original_Cs, i) / len(y)
+        i += iterations
+
+plot = Plot()
 
 # np.random.seed(0)
 t_max = 1500
 t_test = 50
 t_washout = 500 # number of washout steps
-L = max(0, t_max - t_washout) # steps after washout
 aperture = 5
-in_dim = out_dim = 1
-N = 100 # reservoir size
 
 ########################################
 # collect data
@@ -25,52 +82,28 @@ def gen_signal(n, period, amplitude):
     ts = np.arange(n)
     data = amplitude * np.sin(2 * np.pi * (1/period) * ts)
     return data
+
 p1 = gen_signal(t_max, 5, 1)
 p2 = gen_signal(t_max, 10, 1)
-data = [p1, p2]
-ax[0,0].plot(p1[:t_test], label="p1")
-ax[1,0].plot(p2[:t_test], label="p1")
+p3 = gen_signal(t_max, 15, 1)
+data = [p1, p2, p3]
+plot.add(p1[:t_test], "p1")
+plot.addNew(p2[:t_test], "p2")
+plot.addNew(p3[:t_test], "p3")
 
 #######################################
+
 # init reservoir
-W_in = 1.5 * np.random.normal(0, 1, (N,in_dim))
-b = 0.2 * np.random.normal(0, 1, (N,1))
-W_star = sparse.random(N, N, density=.1).toarray()
-W_out = None
-
-#######################################
-# set the spectral radius
-spectral_radius_old = np.max(np.abs(np.linalg.eigvals(W_star)))
-spectral_radius = 1.5
-W_star *= spectral_radius / spectral_radius_old
-
-#######################################
-# conceptors
-def compute_conceptor(X, aperture):
-    R = np.dot( X, X.T ) / X.shape[1]
-    Eig_vals, Eig_vecs = np.linalg.eig(R)
-    U = Eig_vecs
-    Sigma = np.diag(Eig_vals)
-    return np.dot( R, np.linalg.inv( R + 1 / np.square(aperture) * np.eye(X.shape[0]) ) )
+esn = ESN()
 
 #######################################
 # run the reservoir with the signal(s) and collect X
-Cs = []
 X = None
 X_delay = None
 P = None
+original_Cs = []
 for signal in data:
-    x = np.random.normal(0, 1, (N,1))
-    X_local = np.zeros((N,L))
-    X_delay_local = np.zeros((N,L))
-    for t in range(t_max):
-        if (t >= t_washout):
-            X_delay_local[:,t-t_washout] = x[:,0]
-        p = signal[t]
-        x = np.tanh( np.dot( W_star, x ) + np.dot( W_in, p) + b )
-        if (t >= t_washout):
-            X_local[:,t-t_washout] = x[:,0]
-
+    X_local, X_delay_local = esn.run(signal, t_washout)
     if X is None:
         X = X_local
         X_delay = X_delay_local
@@ -80,138 +113,96 @@ for signal in data:
         X = np.concatenate((X, X_local), axis=1)
         X_delay = np.concatenate((X_delay, X_delay_local), axis=1)
         P = np.concatenate((P, signal[t_washout:]))
-    Cs.append( compute_conceptor(X_local, aperture) )
+    original_Cs.append( compute_c(X_local, aperture) )
+
+plot.conceptors_fit_plot(X, original_Cs, "Original C")
 
 #######################################
-# load reservoir by updating W and W_out by ridge regression
-reg_W = 1e-4  # regularization coefficient for internal weights
-reg_out = 1e-2  # regularization coefficient for output weights
-# p (in_dim x t_max)
-# W_in (N x (1 + in_dim))
-# X (N x L)
-# W_star, W (N x N)
-# W_out (out_dim x N)
-B = np.tile( b, L * len(data))
-W = np.dot( np.dot( np.linalg.inv( np.dot( X_delay, X_delay.T ) + reg_W*np.eye(N) ), X_delay ), ( np.arctanh(X)-B ).T ).T
-W_out = ( np.dot( np.dot( np.linalg.inv( np.dot( X, X.T ) + reg_out*np.eye(N) ), X), P.T ) ).T
-
-def shift(signal, phase):
-    for _ in range(phase):
-        signal = signal[-1] + signal[:-1]
-    return signal
+esn.load(X, X_delay, 1e-4)
+esn.train_out_identity(X, P, 1e-2)
 
 #######################################
 # Generate mixed signal
-def generate_mixed_signal(times):
-    y_length = 0
-    t_transition = 10
-    current = 0
-    for _, iterations in times:
-        y_length += iterations
-    
-    x = np.random.normal(0, 1, (N,1))
-    X_regen = np.zeros((N,y_length)) # collection matrix
-    y = np.zeros(y_length)
-    t = 0
-    # Regenerate signal
-    for signal, t_times in times:
-        # if signal == current:
-        #     for t in range(t_transition):
-        #         C = (1 - 1 / t_transition * t) * Cs[current] + (1 / t_transition * t) * Cs[signal]
-        #         x = np.dot( C, np.tanh( np.reshape(b,(N,1)) + np.dot( W, x ) ) )
-        #         y[t] = np.dot( W_out, x )
-        # else:
-        for _ in range(t_times):
-            x = np.dot( Cs[signal], np.tanh( np.reshape(b,(N,1)) + np.dot( W, x ) ) )
-            X_regen[:,t] = x[:,0]
-            y[t] = np.dot( W_out, x )
-            t += 1
-    
-    return y, X_regen
 
-times = [ (0,500), (1,500), (0,500) ]
-y, X_regen = generate_mixed_signal([ (0,500), (1,500), (0,500) ])
-ax[2,0].plot(y, label="Generated signal")
+def assign_to_clusters(nb_points, nb_clusters, mode="EQUAL_SPLIT", limits=[]):
+    assignments = [ [] for _ in range(nb_clusters) ]
+    if mode == "RANDOM" or mode == "EQUAL_SPLIT":
+        assignments = [ x for x in range(nb_points) ]
+        if mode == "RANDOM":
+            np.random.shuffle(assignments)
+        for i in range(nb_clusters):
+            assignments[i] = assignments[i*int(nb_points/nb_clusters):(i+1)*int(nb_points/nb_clusters)]
+    elif mode == "RANGES":
+        mark = 0
+        for i in range(nb_points):
+            if i in limits:
+                mark += 1
+            assignments[mark].append(i)
+    return assignments
 
-#######################################
 
-# Evaluation
-def dist_point_conceptor(point, C):
-    dist = np.dot( np.array(point).T, np.dot(C, point) )
-    return dist
+def assign_fuzzy_to_clusters(nb_points, nb_clusters, transition_time):
+    assignments = [ [] for _ in range(nb_clusters) ]
+    mean_length = int(nb_points/nb_clusters)
+    current = -1
+    for t in range(nb_points):
+        if not t % mean_length:
+            current += 1
+        for i in range(nb_clusters):
+            if i == current:
+                if t % mean_length > mean_length - transition_time and not i + 1 == nb_clusters:
+                    assignments[i].append(1 - (t % mean_length - (mean_length - transition_time)) * 1 / transition_time)
+                else:
+                    assignments[i].append(1)
+            elif i == current + 1 and t % mean_length > mean_length - transition_time:
+                assignments[i].append((t % mean_length - (mean_length - transition_time)) * 1 / transition_time)
+            else:
+                assignments[i].append(0)
+    # plot.inc()
+    # for i in assignments:
+    #     plot.add(i)
+    # plot.finalize()
+    return assignments
 
-def summed_distance(X, C):
-    sum = 0
-    for state_point in zip(*X):
-        sum += dist_point_conceptor(state_point, C)
-    return sum
+
+assignments = assign_fuzzy_to_clusters(1500, 3, 50) #assign_to_clusters(1500, 3)
+y, X_regen = esn.generate(original_Cs, assignments, 1500, True)
+plot.addNew(y, label="Generated signal")
+plot.finalize()
+
 
 #######################################
 # K-means
 
+
+
 def kmeans(y_length, nb_conceptors):
     # Initial assignments and initial conceptors
-    #assignments = np.arange(y_length)
-    #np.random.shuffle(assignments)
-    assignments = [ x for x in range(y_length) ]
-    #indices_by_conceptors = [ assignments[:int(y_length/2)], assignments[int(y_length/2)+1:] ]
-    indices_by_conceptors = [ assignments[:500] + assignments[1000:], assignments[500:1000] ]
-    new_indices_by_conceptors = indices_by_conceptors.copy()
+    new_assignments = assign_to_clusters(y_length, nb_conceptors, "RANDOM")
     # Training loop
-    for epoch in range(10000):
+    for epoch in range(100):
+        print("epoch:",epoch)
         # recompute centroids based on subset of assigned state
-        conceptors = [ compute_conceptor(X_regen[:,indices_by_conceptor], aperture) for indices_by_conceptor in new_indices_by_conceptors ]
+        conceptors = [ compute_c(X_regen[:,assignments], aperture) for assignments in new_assignments ]
         # recompute assignments by find the closest conceptor for each of the state points
-        old_indices_by_conceptors = new_indices_by_conceptors.copy()
-        new_indices_by_conceptors = [ [] for _ in range(nb_conceptors) ]
+        old_assignments = new_assignments.copy()
+        new_assignments = [ [] for _ in range(nb_conceptors) ]
         for t in range(y_length):
-            min_dist = INFINITY
-            min_conceptor_index = np.random.choice(range(nb_conceptors))
-            for conceptor_index, conceptor in enumerate(conceptors):
-                dist = dist_point_conceptor(X_regen[:,t],conceptor) # compute distance from X_regen(:,i) to conceptor
-                if dist < min_dist:
-                    min_dist = dist
-                    min_conceptor_index = conceptor_index
-            new_indices_by_conceptors[ min_conceptor_index ].append(t)
-        print("epoch=",epoch) 
+            conceptor_index, _ = find_closest_C(X_regen[:,t], conceptors)
+            new_assignments[ conceptor_index ].append(t)
 
         # stop if converged
-        for new_indices_by_conceptor, old_indices_by_conceptor in zip(new_indices_by_conceptors, old_indices_by_conceptors):
-            if new_indices_by_conceptor.sort() == old_indices_by_conceptor.sort():
-                return conceptors, new_indices_by_conceptors
+        for new_assignment, old_assignment in zip(new_assignments, old_assignments):
+            if set(new_assignment) == set(old_assignment):
+                print("Converged")
+                return conceptors, new_assignments
 
-conceptors, indices_by_conceptors = kmeans(len(y), len(data)) # as many conceptors as loaded patterns
+    return conceptors, new_assignments
 
-# Plot memberships
-collection = [ [] for _ in range(len(data)) ]
-for t in range(1500):
-    for idx, Cl in enumerate(indices_by_conceptors):
-        if t in Cl:
-            collection[idx].append(1)
-        else:
-            collection[idx].append(0)
-
-ax[3,0].plot(collection[1][:100], color="blue", label="C1")
-ax[3,0].plot(collection[0][:100], color="red", label="C1")
-
+kmeans_Cs, assignments = kmeans(len(y), 3) # as many conceptors as loaded patterns
 
 #######################################
-# Evaluate
-kmeans_perf = 0
-original_perf = 0
+# Classify on original and clustered conceptors
+plot.conceptors_fit_plot(X, kmeans_Cs, "Kmeans C")
 
-print(len(indices_by_conceptors[0]),len(indices_by_conceptors[1]))
-
-for conceptor, indices_by_conceptor in zip(conceptors, indices_by_conceptors):
-    kmeans_perf += summed_distance(X_regen[:,indices_by_conceptor], conceptor) / len(y)
-
-for conceptor_index, iterations in times:
-    i = 0
-    original_perf += summed_distance(X_regen[:,i:i+iterations], Cs[conceptor_index]) / len(y)
-    i += iterations
-
-print("kmeans_perf=",kmeans_perf)
-print("original_perf=",original_perf)
-
-fig.suptitle('Aperture='+str(aperture)+', N='+str(N)+', Spec Rad='+str(spectral_radius), fontsize=16)
-plt.show()
+plot.finalize(title='Aperture='+str(aperture)+', N='+str(esn.N)+', Spec Rad='+str(esn.spectral_radius))
