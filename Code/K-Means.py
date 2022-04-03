@@ -9,23 +9,9 @@ inv = linalg.inv
 from lib.conceptors import *
 from lib.esn import ESN
 
-def shift(signal, phase):
-    for _ in range(phase):
-        signal = signal[-1] + signal[:-1]
-    return signal
-
-def ridge_regression(X, Y, reg_param):
-    """
-    Ridge regression solving W x = y
-    """
-    XTX = X.T @ X
-    return (np.linalg.inv(XTX + reg_param * np.eye(XTX.shape[0])) @ X.T @ Y).T
-
-#######################################
-
-
-# Evaluate
-
+"""
+Problem-specific plotting
+"""
 class Plot:
     def __init__(self):
         self.ymax = 3
@@ -36,45 +22,54 @@ class Plot:
     def add(self, y, label="No Label"):
         y_idx = self.cnt % self.ymax
         x_idx = int(floor(self.cnt / self.ymax))
-        self.ax[y_idx,x_idx].plot(y, label=label)
-        self.ax[y_idx,x_idx].legend()
-        if label == "Original C":
-            print("OG C", y_idx, x_idx)
+        self.ax[y_idx, x_idx].plot(y, label=label)
+        self.ax[y_idx, x_idx].legend()
 
     def inc(self):
         if self.cnt < self.xmax * self.ymax:
             self.cnt += 1
 
-    def addNew(self, y, label="No Label"):
+    def add_new(self, y, label="No Label"):
         self.inc()
         self.add(y, label)
 
+    def add_new_assignment_plot(self,assignments):
+        self.inc()
+        for i in assignments:
+            self.add(i)
+
     def finalize(self, title="No Title"):
-        plot.fig.suptitle(title, fontsize=16)
+        self.fig.suptitle(title, fontsize=16)
         plt.show()
 
     def conceptors_fit_plot(self, X, Cs, label):
+        self.inc()
         collection, _ = test(X, Cs, "PROP")
-        plot.inc()
         for i, vals in enumerate(collection):
             # walking average of d
-            d = 15
+            d = 20
             smoothed = np.convolve(np.array(vals), np.ones(d), 'valid') / d
-            plot.add(smoothed, label=label+str(i))
-
-def predict_correct():
-    for i, iterations in enumerate(assignments):
-        i = 0
-        original_perf += mean_fit(X_regen[:,i:i+iterations], original_Cs, i) / len(y)
-        i += iterations
+            self.add(smoothed, label=label+str(i))
 
 plot = Plot()
 
+########################################
+# Hyperparameters
+
 # np.random.seed(0)
-t_max = 1500
+t_max = 1000
 t_test = 50
 t_washout = 500 # number of washout steps
 aperture = 5
+
+esn_params = {
+    "in_dim": 1,
+    "out_dim": 1,
+    "N": 100,
+    "W_in_scale": 1.5,
+    "b_scale": .2,
+    "spectral_radius": 1.5
+}
 
 ########################################
 # collect data
@@ -83,21 +78,24 @@ def gen_signal(n, period, amplitude):
     data = amplitude * np.sin(2 * np.pi * (1/period) * ts)
     return data
 
-p1 = gen_signal(t_max, 5, 1)
-p2 = gen_signal(t_max, 10, 1)
-p3 = gen_signal(t_max, 15, 1)
+print("Generating signals")
+p1 = gen_signal(t_max, 8, 1)
+p2 = gen_signal(t_max, 14, 1)
+p3 = gen_signal(t_max, 20, 1)
 data = [p1, p2, p3]
-plot.add(p1[:t_test], "p1")
-plot.addNew(p2[:t_test], "p2")
-plot.addNew(p3[:t_test], "p3")
-
+# plot.add(p1[:t_test], "p1")
+# plot.add_new(p2[:t_test], "p2")
+# plot.add_new(p3[:t_test], "p3")
+p_combined = np.concatenate((p1,p2[t_washout:],p3[t_washout:]))
+plot.add(p_combined, label="Input signal")
 #######################################
-
 # init reservoir
-esn = ESN()
+
+esn = ESN(esn_params)
 
 #######################################
 # run the reservoir with the signal(s) and collect X
+print("Running and loading reservoir with different signals")
 X = None
 X_delay = None
 P = None
@@ -115,11 +113,13 @@ for signal in data:
         P = np.concatenate((P, signal[t_washout:]))
     original_Cs.append( compute_c(X_local, aperture) )
 
-plot.conceptors_fit_plot(X, original_Cs, "Original C")
+X_combined, X_combined_delay = esn.run(p_combined, t_washout)
+p_combined = p_combined[t_washout:]
+plot.conceptors_fit_plot(X_combined, original_Cs, "Original C")
 
 #######################################
-esn.load(X, X_delay, 1e-4)
-esn.train_out_identity(X, P, 1e-2)
+esn.load(X_combined, X_combined_delay, 1e-4)
+esn.train_out_identity(X_combined, p_combined, 1e-2)
 
 #######################################
 # Generate mixed signal
@@ -127,11 +127,11 @@ esn.train_out_identity(X, P, 1e-2)
 def assign_to_clusters(nb_points, nb_clusters, mode="EQUAL_SPLIT", limits=[]):
     assignments = [ [] for _ in range(nb_clusters) ]
     if mode == "RANDOM" or mode == "EQUAL_SPLIT":
-        assignments = [ x for x in range(nb_points) ]
+        points = [ x for x in range(nb_points) ]
         if mode == "RANDOM":
-            np.random.shuffle(assignments)
+            np.random.shuffle(points)
         for i in range(nb_clusters):
-            assignments[i] = assignments[i*int(nb_points/nb_clusters):(i+1)*int(nb_points/nb_clusters)]
+            assignments[i] = points[i*int(nb_points/nb_clusters):(i+1)*int(nb_points/nb_clusters)]
     elif mode == "RANGES":
         mark = 0
         for i in range(nb_points):
@@ -140,8 +140,10 @@ def assign_to_clusters(nb_points, nb_clusters, mode="EQUAL_SPLIT", limits=[]):
             assignments[mark].append(i)
     return assignments
 
-
 def assign_fuzzy_to_clusters(nb_points, nb_clusters, transition_time):
+    """
+    Distributes points over clusters smoothly changing float membership
+    """
     assignments = [ [] for _ in range(nb_clusters) ]
     mean_length = int(nb_points/nb_clusters)
     current = -1
@@ -158,51 +160,48 @@ def assign_fuzzy_to_clusters(nb_points, nb_clusters, transition_time):
                 assignments[i].append((t % mean_length - (mean_length - transition_time)) * 1 / transition_time)
             else:
                 assignments[i].append(0)
-    # plot.inc()
-    # for i in assignments:
-    #     plot.add(i)
-    # plot.finalize()
     return assignments
 
-
-assignments = assign_fuzzy_to_clusters(1500, 3, 50) #assign_to_clusters(1500, 3)
-y, X_regen = esn.generate(original_Cs, assignments, 1500, True)
-plot.addNew(y, label="Generated signal")
-plot.finalize()
-
+assignments = assign_fuzzy_to_clusters(t_max, 3, transition_time=100)
+y, X_regen = esn.generate(original_Cs, assignments, t_max, True)
+#plot.add_new(y, label="Generated signal")
 
 #######################################
 # K-means
 
-
-
-def kmeans(y_length, nb_conceptors):
+def kmeans(X, nb_conceptors, aperture, epochs=100):
+    print("K-means")
     # Initial assignments and initial conceptors
-    new_assignments = assign_to_clusters(y_length, nb_conceptors, "RANDOM")
+    nb_points = X.shape[1]
+    new_assignments = assign_to_clusters(nb_points, nb_conceptors, "RANDOM")
+    #new_assignments = assign_to_clusters(nb_points, nb_conceptors, "RANGES", [500,800])
+    #new_assignments = assign_to_clusters(nb_points, nb_conceptors, "EQUAL_SPLIT")
     # Training loop
-    for epoch in range(100):
+    for epoch in range(epochs):
         print("epoch:",epoch)
         # recompute centroids based on subset of assigned state
-        conceptors = [ compute_c(X_regen[:,assignments], aperture) for assignments in new_assignments ]
+        Cs = [ compute_c(X[:,assignments], aperture) for assignments in new_assignments ]
+        plot.conceptors_fit_plot(X, Cs, "K-means epoch:"+str(epoch)+", C")
         # recompute assignments by find the closest conceptor for each of the state points
         old_assignments = new_assignments.copy()
         new_assignments = [ [] for _ in range(nb_conceptors) ]
-        for t in range(y_length):
-            conceptor_index, _ = find_closest_C(X_regen[:,t], conceptors)
+        for t in range(nb_points):
+            conceptor_index, _ = find_closest_C(X[:,t], Cs)
             new_assignments[ conceptor_index ].append(t)
 
         # stop if converged
         for new_assignment, old_assignment in zip(new_assignments, old_assignments):
             if set(new_assignment) == set(old_assignment):
                 print("Converged")
-                return conceptors, new_assignments
+                return Cs, new_assignments
 
-    return conceptors, new_assignments
+    return Cs, new_assignments
 
-kmeans_Cs, assignments = kmeans(len(y), 3) # as many conceptors as loaded patterns
+# cluster into as many conceptors as patterns
+kmeans_Cs, assignments = kmeans(X_combined, nb_conceptors=3, aperture=aperture, epochs=100)
 
 #######################################
 # Classify on original and clustered conceptors
-plot.conceptors_fit_plot(X, kmeans_Cs, "Kmeans C")
+#plot.conceptors_fit_plot(X_combined, kmeans_Cs, "Kmeans C")
 
 plot.finalize(title='Aperture='+str(aperture)+', N='+str(esn.N)+', Spec Rad='+str(esn.spectral_radius))

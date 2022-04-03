@@ -4,15 +4,15 @@ import numpy as np
 inv = linalg.inv
 
 class ESN:
-    def __init__(self):
-        self.in_dim = 1 # W_in (N x (1 + in_dim))
-        self.out_dim = 1 # W_out (out_dim x N)
-        self.N = 100 # reservoir size
-        self.W_in = 1.5 * np.random.normal(0, 1, (self.N,self.in_dim))
-        self.b = 0.2 * np.random.normal(0, 1, (self.N,1))
+    def __init__(self, esn_params):
+        self.in_dim = esn_params["in_dim"] # W_in (N x (1 + in_dim))
+        self.out_dim = esn_params["out_dim"] # W_out (out_dim x N)
+        self.N = esn_params["N"] # reservoir size
+        self.W_in = esn_params["W_in_scale"] * np.random.normal(0, 1, (self.N,self.in_dim))
+        self.b = esn_params["b_scale"] * np.random.normal(0, 1, (self.N,1))
         self.W = sparse.random(self.N, self.N, density=.1).toarray() # W (N x N)
         self.W_out = None
-        self.spectral_radius = 1.5
+        self.spectral_radius = esn_params["spectral_radius"]
         self.set_spectral_radius(self.spectral_radius)
     
     def set_spectral_radius(self, radius):
