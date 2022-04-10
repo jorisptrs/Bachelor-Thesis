@@ -37,13 +37,13 @@ class ESN:
                 C_lin_comb = np.zeros((self.N, self.N))
                 for i, C in enumerate(Cs):
                     C_lin_comb += assignments[i][t] * C
-                x = C_lin_comb @ np.tanh( np.reshape(self.b,(self.N,1)) + np.dot( self.W, x ) )
+                x = C_lin_comb @ np.tanh( np.reshape(self.b,(self.N,1)) + ( self.W @ x ) )
             else:
                 C_idx = 0
                 for idx, iterations in enumerate(assignments):
                     if t in iterations:
                         C_idx = idx
-                x = Cs[C_idx] @ np.tanh( np.reshape(self.b,(self.N,1)) + np.dot( self.W, x ) )
+                x = Cs[C_idx] @ np.tanh( np.reshape(self.b,(self.N,1)) + ( self.W @ x ) )
             X_regen[:,t] = x[:,0]
             y[t] = self.W_out @ x
         return y, X_regen
@@ -85,4 +85,4 @@ class ESN:
         """
         :param reg_out: regularization coefficient for output weights
         """
-        self.W_out = ( np.dot( np.dot( inv( np.dot( X, X.T ) + reg_out*np.eye(self.N) ), X), P.T ) ).T
+        self.W_out = ( inv( ( X @ X.T ) + reg_out*np.eye(self.N) ) @ X @ P.T ).T

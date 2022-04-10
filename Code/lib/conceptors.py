@@ -7,13 +7,35 @@ def corr(X):
     L = X.shape[1] or 1
     return X @ X.T / L
 
+def NRMSE(signal, signal_truth, max_shift):
+    """
+    Compute normalized root mean squared error between a (trained) signal and
+    and ground truth signal. Attempts to correct for phase shifts below max_shift.
+    """
+    K = len(signal)-max_shift
+
+    mse = [
+        np.mean([ (signal[(i+d)]-signal_truth[i]) **2 for i in range(K) ])  
+        for d in range(max_shift)
+    ]
+    
+    nrmse = np.sqrt(min(mse)/np.mean(signal_truth ** 2))
+    return nrmse
+
+
 # conceptors
 def similarity_c(C1,C2):
-    U1, s1, _ = linalg.svd(C1, hermitian=True, full_matrices=False)
-    U2, s2, _ = linalg.svd(C2, hermitian=True, full_matrices=False)
+    U1, s1, _ = np.linalg.svd(C1, hermitian=True, full_matrices=False)
+    U2, s2, _ = np.linalg.svd(C2, hermitian=True, full_matrices=False)
 
     return linalg.norm(
         np.diag(s1)**0.5 @ U1.T @ U2 @ np.diag(s2)**0.5)**2 / (linalg.norm(s1)*linalg.norm(s2))
+
+def max_similarity(Cs, Cs_truth):
+    sum = 0
+    for C in Cs:
+        sum += max([ similarity_c(C, C_truth) for C_truth in Cs_truth ])
+    return sum
 
 def compute_c(X, aperture):
     R = corr(X)
@@ -68,7 +90,7 @@ def negative_c(Cs, idx_of_positive_c):
     return NOT_C( N )
 
 # Evaluation
-def fit(point, Cs, idx):
+def combined_evidence(point, Cs, idx):
     """
     Returns combined evidence that a state point corresponds to the conceptor Cs[idx]
     """
@@ -78,12 +100,12 @@ def fit(point, Cs, idx):
     e_neg = np.array(point).T @ negative_c(Cs, idx) @ point
     return e_pos + e_neg
 
-def mean_fit(X, Cs, idx):
+def mean_combined_evidence(X, Cs, assignments):
     sum = 0
-    for state_point in zip(*X):
-        sum += fit(state_point, Cs, idx) / X.shape[1]
+    for idx, assigned_time_steps in enumerate(assignments):
+        for t in assigned_time_steps:
+            sum += combined_evidence(X[:,t], Cs, idx) / X.shape[1]
     return sum
-
 
 def find_closest_C(x, Cs):
     """
@@ -92,7 +114,7 @@ def find_closest_C(x, Cs):
     max_dist = 0
     max_conceptor_index = np.random.choice(range(len(Cs)))
     for conceptor_index in range(len(Cs)):
-        dist = fit(x, Cs, conceptor_index) # compute distance from X_regen(:,i) to conceptor
+        dist = combined_evidence(x, Cs, conceptor_index) # compute distance from X_regen(:,i) to conceptor
         if dist > max_dist:
             max_dist = dist
             max_conceptor_index = conceptor_index
@@ -117,7 +139,7 @@ def test(X, Cs, mode="PROP"):
         elif mode == "PROP": # proportional
             sum_dist = 0
             for c_idx in range(len(Cs)):
-                dist = fit(X[:,t], Cs, c_idx)
+                dist = combined_evidence(X[:,t], Cs, c_idx)
                 sum_dist += dist
                 collection[ c_idx ].append(dist)
                 mean_dist += dist / y_len
