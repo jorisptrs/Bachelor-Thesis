@@ -1,0 +1,8 @@
+code/data/TIMIT
+*.ipynb_checkpoints/
+__pycache__/
+*.pyc
+code/cache/
+.idea
+*.iml
+.DS_Store

@@ -1,0 +1,9 @@
+numpy
+librosa
+scipy
+pandas
+gc-python-utils
+matplotlib
+scikit-optimize
+jupyter
+seaborn

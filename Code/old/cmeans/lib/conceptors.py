@@ -1,12 +1,13 @@
 import numpy as np
-from scipy import linalg
+from scipy import linalg, optimize
+from scipy.misc import derivative
 
 inv = linalg.inv
-pinv = linalg.pinv
 
 
 ######################################################################################################################
 # Basics
+
 
 def corr(X, weights=None):
     if weights:
@@ -30,20 +31,6 @@ def compute_c(X, aperture, weights=None):
     #     if abs(elem) < 1e-100:
     #         print("!!! Zero singular value(s) !!!")
     return R @ inv(R + aperture ** (-2) * np.eye(R.shape[0]))
-
-
-def add_instance(C, x, lb, aperture):
-    """
-    Adds x to conceptor C already containing n instances
-    """
-    return C + lb * ((x - C @ x) @ x.T - aperture ** (-2) * C)
-
-
-def remove_instance(C, x, lb, aperture):
-    """
-    Adds x to conceptor C already containing n instances
-    """
-    return C + lb * ((x - C @ x) @ x.T - aperture ** (-2) * C)
 
 
 ######################################################################################################################
@@ -70,88 +57,65 @@ def NOT_C(C):
     return np.eye(C.shape[0]) - C
 
 
-def non_singular_base(C, epsilon):
+def non_singular_base(C):
     U, s, _ = np.linalg.svd(C, hermitian=True)
+    epsilon = 1e-10
     return U[:, np.sum(s > epsilon):]
 
 
-def AND_C(C1, C2, epsilon=1e-10):
-    U_sub = non_singular_base(C1, epsilon)
-    V_sub = non_singular_base(C2, epsilon)
-    Base = non_singular_base(U_sub @ U_sub.T + V_sub @ V_sub.T, epsilon)
-    return Base @ inv(Base.T @ (pinv(C1) + pinv(C2) - np.eye(C1.shape[0])) @ Base) @ Base.T
-    # return pinv( Base.T @ (pinv(C1) + pinv(C2) - np.eye(C1.shape[0])) @ Base)
+def AND_C(C1, C2):
+    U_sub = non_singular_base(C1)
+    V_sub = non_singular_base(C2)
+    U, s, _ = np.linalg.svd(C1, hermitian=True)
+    epsilon = 1e-10
+    print(np.sum(s > epsilon))
+    Base = non_singular_base(U_sub @ U_sub.T + V_sub @ V_sub.T)
+    return Base @ inv(Base.T @ (inv(C1) + inv(C2) - np.eye(C1.shape[0])) @ Base) @ Base.T
 
 
-def OR_C(C1, C2, epsilon=1e-10):
-    return NOT_C(AND_C(NOT_C(C1), NOT_C(C2), epsilon=epsilon))
+def OR_C(C1, C2):
+    return NOT_C(AND_C(NOT_C(C1), NOT_C(C2)))
 
 
 def negative_c(Cs, idx_of_positive_c):
-    if len(Cs) > 1:
-        Cs = Cs[:idx_of_positive_c] + Cs[idx_of_positive_c + 1:]
-        N = Cs[0]
-        for C in Cs[1:]:
-            N = OR_C(N, C)
-    else:
-        N = Cs[0]
+    Cs = Cs[:idx_of_positive_c] + Cs[idx_of_positive_c + 1:]
+    N = Cs[0]
+    for C in Cs[1:]:
+        N = OR_C(N, C)
     return NOT_C(N)
-
-
-def Ns_from_Cs(Cs):
-    return [negative_c(Cs, idx) for idx in range(len(Cs))]
 
 
 ######################################################################################################################
 # Aperture adaption
 
-def sum_of_singular_vals(C):
-    _, s, _ = np.linalg.svd(C, hermitian=True)
-    return np.sum(s)
-
-
-def adapt_singular_vals(C, target_sum, iterations):
-    for _ in range(iterations):
-        C = phi(C, target_sum / sum_of_singular_vals(C))
-    return C
-
-
-def adapt_singular_vals_of_Cs(Cs, target_sum, iterations):
-    for _ in range(iterations):
-        normalized_Cs = []
-        for C in Cs:
-            normalized_Cs.append(phi(C, target_sum / sum_of_singular_vals(C)))
-        t_local = np.std([sum_of_singular_vals(C) for C in normalized_Cs])
-        Cs = normalized_Cs
-    return Cs
-
-def normalize_apertures(Cs, iterations=10, target_sum=None):
+def normalize_apertures(Cs):
     """
-    Normalize all conceptors in Cs to have equal summed singular values
+    Normalize all conceptors to the average of their summed singular values
     """
-    if target_sum == None:
-        target_sum = np.mean([sum_of_singular_vals(C) for C in Cs])
-    st = np.std([sum_of_singular_vals(C) for C in Cs])
-    print("Target: ", target_sum)
-    print("std", st)
-    return adapt_singular_vals_of_Cs(Cs, target_sum, iterations), target_sum
-
-
-def optimize_apertures(Cs):
-    gammas = []
+    sum_avg = 0
     normalized_Cs = []
-    print("Computing gammas...")
-    for i, C in enumerate(Cs):
-        #print(i + 1, " of ", len(Cs))
-        gammas.append(best_gamma(C))
-    optimal_gamma = np.mean(gammas)
-    print("Optimal gamma: ", optimal_gamma)
-    for i, C in enumerate(Cs):
-        normalized_Cs.append(phi(C, R=None, gamma=optimal_gamma))
+    for C in Cs:
+        _, s, _ = np.linalg.svd(C, hermitian=True)
+        sum_avg += np.sum(s) / len(Cs)
+    for C in Cs:
+        _, s, _ = np.linalg.svd(C, hermitian=True)
+        sum_local = np.sum(s)
+        normalized_Cs.append(C * sum_avg / sum_local)
     return normalized_Cs
 
 
-def phi(C=None, gamma=1, R=None):
+def optimize_apertures(Cs):
+    mean_gamma = 0
+    normalized_Cs = []
+    for C in Cs:
+        bg = best_gamma(C)
+        mean_gamma += bg / len(Cs)
+    for C in Cs:
+        normalized_Cs.append(phi(C, R=None, gamma=mean_gamma))
+    return normalized_Cs
+
+
+def phi(C=None, R=None, gamma=1):
     if isinstance(gamma, list):
         gamma = gamma[0]
     if C is not None:
@@ -166,18 +130,27 @@ def phi_squared(gamma, C):
     return linalg.norm(phi(C, R=None, gamma=gamma), 'fro') ** 2
 
 
-def best_gamma(C, start=0.5, end=200, dx=1):
-    ds = []
-    gammas = np.linspace(start, end, int((end - start) / dx))
-    for i in range(len(gammas) - 1):
-        dgamma = gammas[i + 1] - gammas[i]
-        df = phi_squared(gamma=gammas[i + 1], C=C) - phi_squared(gamma=gammas[i], C=C)
-        ds.append(gammas[i] * df / dgamma)
-    return gammas[np.argmax(ds)]
+def delta(gamma, C):
+    return gamma * derivative(phi_squared, x0=gamma, dx=1e-6, args=(C,))
+
+
+def ddelta(gamma, C):
+    return derivative(delta, x0=gamma, dx=1e-6, args=(C,))
+
+
+def best_gamma(C):
+    res = optimize.minimize(ddelta, x0=2, bounds=[(1, 100), ], args=(C,))
+    return (res.x)[0]
 
 
 ######################################################################################################################
 # Clustering
+
+def best_mus(x, Cs):
+    """
+    Returns mus for linear combination
+    """
+
 
 def normalized_evidences_by_conceptor(x, Cs):
     """
@@ -247,42 +220,6 @@ def max_similarity(Cs, Cs_truth):
     for C in Cs:
         sum += max([similarity_c(C, C_truth) for C_truth in Cs_truth])
     return sum
-
-
-def combined_evidence_vec(X, Cs, idx, Ns=None):
-    """
-    Vectorized combined evidences
-    """
-    # positive evidence
-    e_pos = np.sum(X * (Cs[idx] @ X))
-    # negative evidence
-    if Ns:
-        e_neg = np.sum(X * (Ns[idx] @ X))
-    else:
-        e_neg = np.sum(X * (negative_c(Cs, idx) @ X))
-    return (e_pos + e_neg) / 2
-
-
-def evidences_for_Cs(X, Cs, Ns):
-    return [combined_evidence_vec(X, Cs, idx, Ns) for idx in range(len(Cs))]
-
-
-def combined_evidence_vec_z(z, Cs, idx, Ns=None):
-    """
-    Vectorized combined evidences
-    """
-    # positive evidence
-    e_pos = z.T @ Cs[idx] @ z
-    # negative evidence
-    if Ns:
-        e_neg = z.T @ Ns[idx] @ z
-    else:
-        e_neg = z.T @ negative_c(Cs, idx) @ z
-    return (e_pos + e_neg) / 2
-
-
-def evidences_for_Cs_z(z, Cs, Ns):
-    return [combined_evidence_vec_z(z, Cs, idx, Ns) for idx in range(len(Cs))]
 
 
 def combined_evidence(point, Cs, idx):
