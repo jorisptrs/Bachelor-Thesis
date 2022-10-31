@@ -1,9 +1,9 @@
 numpy
+scikit-optimize
 librosa
 scipy
 pandas
-gc-python-utils
+python-utils
 matplotlib
-scikit-optimize
 jupyter
 seaborn

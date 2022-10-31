@@ -110,22 +110,29 @@ def sum_of_singular_vals(C):
     return np.sum(s)
 
 
-def adapt_singular_vals(C, target_sum, iterations):
-    for _ in range(iterations):
-        C = phi(C, target_sum / sum_of_singular_vals(C))
-    return C
+def adapt_singular_vals(C, target_sum, epsilon):
+    hist = []
+    for i in range(50):
+        ss = sum_of_singular_vals(C)
+        hist.append(ss)
+        if abs(ss-target_sum) < epsilon:
+            break
+        gamma = target_sum / sum_of_singular_vals(C)
+        C = phi(C, gamma=gamma)
+    return C, hist
 
 
-def adapt_singular_vals_of_Cs(Cs, target_sum, iterations):
-    for _ in range(iterations):
-        normalized_Cs = []
-        for C in Cs:
-            normalized_Cs.append(phi(C, target_sum / sum_of_singular_vals(C)))
-        t_local = np.std([sum_of_singular_vals(C) for C in normalized_Cs])
-        Cs = normalized_Cs
-    return Cs
+def adapt_singular_vals_of_Cs(Cs, target_sum, epsilon=0.01):
+    normalized_Cs = []
+    hists = []
+    for C in Cs:
+        normalized_C, hist = adapt_singular_vals(C,target_sum,epsilon=epsilon)
+        normalized_Cs.append(normalized_C)
+        hists.append(hist)
+    t_local = np.std([sum_of_singular_vals(C) for C in normalized_Cs])
+    return normalized_Cs, hists
 
-def normalize_apertures(Cs, iterations=10, target_sum=None):
+def normalize_apertures(Cs, target_sum=None):
     """
     Normalize all conceptors in Cs to have equal summed singular values
     """
@@ -134,24 +141,24 @@ def normalize_apertures(Cs, iterations=10, target_sum=None):
     st = np.std([sum_of_singular_vals(C) for C in Cs])
     print("Target: ", target_sum)
     print("std", st)
-    return adapt_singular_vals_of_Cs(Cs, target_sum, iterations), target_sum
+    return adapt_singular_vals_of_Cs(Cs, target_sum), target_sum
 
 
-def optimize_apertures(Cs):
+def optimize_apertures(Cs, start=0.5, end=1000, n=150):
     gammas = []
     normalized_Cs = []
     print("Computing gammas...")
     for i, C in enumerate(Cs):
         #print(i + 1, " of ", len(Cs))
-        gammas.append(best_gamma(C))
+        gammas.append(best_gamma(C, start, end, n))
     optimal_gamma = np.mean(gammas)
     print("Optimal gamma: ", optimal_gamma)
     for i, C in enumerate(Cs):
-        normalized_Cs.append(phi(C, R=None, gamma=optimal_gamma))
+        normalized_Cs.append(phi(C, gamma=optimal_gamma, R=None))
     return normalized_Cs
 
 
-def phi(C=None, gamma=1, R=None):
+def phi(C=None, gamma=1.0, R=None):
     if isinstance(gamma, list):
         gamma = gamma[0]
     if C is not None:
@@ -166,9 +173,12 @@ def phi_squared(gamma, C):
     return linalg.norm(phi(C, R=None, gamma=gamma), 'fro') ** 2
 
 
-def best_gamma(C, start=0.5, end=200, dx=1):
+def best_gamma(C, start=0.5, end=1000, n=200):
     ds = []
-    gammas = np.linspace(start, end, int((end - start) / dx))
+    exponents = np.linspace(np.log2(start), np.log2(end), n)
+    gammas = [ 2 ** exponent for exponent in exponents ]
+    #gammas = np.linspace(start, end, n)
+
     for i in range(len(gammas) - 1):
         dgamma = gammas[i + 1] - gammas[i]
         df = phi_squared(gamma=gammas[i + 1], C=C) - phi_squared(gamma=gammas[i], C=C)

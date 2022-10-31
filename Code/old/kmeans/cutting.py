@@ -32,7 +32,7 @@ esn_params = {
 
 
 ########################################
-# collect data
+# collect dataset
 
 def gen_signal(n, period, amplitude):
     """

@@ -1,15 +1,16 @@
+import gc
 import os
 import pickle as pkl
 
 import librosa
 import librosa.display
 import numpy as np  # linear algebra
-import pandas as pd  # data processing, CSV file I/O (e.g. pd.read_csv)
+import pandas as pd  # dataset processing, CSV file I/O (e.g. pd.read_csv)
 from scipy.interpolate import CubicSpline
 
 
 class Feature_Collector():
-    __data_directory = './data'
+    __data_directory = './dataset'
     __main_directory = './TIMIT'
     _winlen = 0.025
     _winstep = 0.001
@@ -20,7 +21,7 @@ class Feature_Collector():
 
         self._winstep = stepsize
         self.__main_directory = path + 'TIMIT/'
-        self.__data_directory = path + "TIMIT/data/"
+        self.__data_directory = path + "TIMIT/dataset/"
 
         # TimitBet 61 phoneme mapping to 39 phonemes
         # by Lee, K.-F., & Hon, H.-W. (1989). Speaker-independent phone recognition using hidden Markov models. IEEE Transactions on Acoustics, Speech, and Signal Processing, 37(11), 1641–1648. doi:10.1109/29.46546 
@@ -399,7 +400,7 @@ class Feature_Collector():
 
             return feature_vectors, labels, sr
 
-    def collectFeaturesInSegments(self, ft='Train', n_mels=15, delta=True, delta_delta=True,
+    def collectFeaturesInSegments(self, ft='Train', n_mels=15, delta=False, delta_delta=False,
                                   normalize=True, long_version=False, speakers=[], dr=[], sentence="", subsamples=10,
                                   path_option=""):
         """
@@ -440,6 +441,7 @@ class Feature_Collector():
                 for feature in fv:
                     feature_vectors.append(np.asarray(np.array(feature, dtype=object)).astype(np.float32))
                 labels += lv
+
             if normalize:
                 unrolled = np.asarray(feature_vectors).transpose(1, 0, 2).reshape(feature_vectors[0].shape[0], -1)
                 mini = np.expand_dims(unrolled.min(axis=1), 1)
@@ -454,5 +456,7 @@ class Feature_Collector():
                 flp.close()
             print('--- Completed')
             # -------
+        gc.collect()
 
+        print(f"Loaded to {len(feature_vectors)} samples of shape {feature_vectors[0].shape}")
         return feature_vectors, labels, oversamplings

@@ -6,6 +6,7 @@ inv = linalg.inv
 
 class ESN:
     def __init__(self, esn_params):
+        self.esn_params = esn_params
         self.in_dim = esn_params["in_dim"]  # W_in (N x (1 + in_dim))
         self.out_dim = esn_params["out_dim"]  # W_out (out_dim x N)
         self.N = esn_params["N"]  # reservoir size
