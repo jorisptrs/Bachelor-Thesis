@@ -111,26 +111,21 @@ def sum_of_singular_vals(C):
 
 
 def adapt_singular_vals(C, target_sum, epsilon):
-    hist = []
     for i in range(50):
         ss = sum_of_singular_vals(C)
-        hist.append(ss)
         if abs(ss-target_sum) < epsilon:
             break
         gamma = target_sum / sum_of_singular_vals(C)
         C = phi(C, gamma=gamma)
-    return C, hist
+    return C
 
 
 def adapt_singular_vals_of_Cs(Cs, target_sum, epsilon=0.01):
     normalized_Cs = []
-    hists = []
     for C in Cs:
-        normalized_C, hist = adapt_singular_vals(C,target_sum,epsilon=epsilon)
+        normalized_C = adapt_singular_vals(C,target_sum,epsilon=epsilon)
         normalized_Cs.append(normalized_C)
-        hists.append(hist)
-    t_local = np.std([sum_of_singular_vals(C) for C in normalized_Cs])
-    return normalized_Cs, hists
+    return normalized_Cs
 
 def normalize_apertures(Cs, target_sum=None):
     """
@@ -141,7 +136,7 @@ def normalize_apertures(Cs, target_sum=None):
     st = np.std([sum_of_singular_vals(C) for C in Cs])
     print("Target: ", target_sum)
     print("std", st)
-    return adapt_singular_vals_of_Cs(Cs, target_sum), target_sum
+    return adapt_singular_vals_of_Cs(Cs, target_sum)
 
 
 def optimize_apertures(Cs, start=0.5, end=1000, n=150):
@@ -273,9 +268,11 @@ def combined_evidence_vec(X, Cs, idx, Ns=None):
     return (e_pos + e_neg) / 2
 
 
-def evidences_for_Cs(X, Cs, Ns):
-    return [combined_evidence_vec(X, Cs, idx, Ns) for idx in range(len(Cs))]
-
+def evidences_for_Cs(X, Cs, Ns, two_d=True):
+    es = [combined_evidence_vec(X, Cs, idx, Ns) for idx in range(len(Cs))]
+    if two_d:
+        es = [np.sum(e) for e in es]
+    return es
 
 def combined_evidence_vec_z(z, Cs, idx, Ns=None):
     """

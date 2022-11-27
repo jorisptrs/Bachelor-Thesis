@@ -9,36 +9,36 @@ import pandas as pd  # dataset processing, CSV file I/O (e.g. pd.read_csv)
 from scipy.interpolate import CubicSpline
 
 
-class Feature_Collector():
-    __data_directory = './dataset'
-    __main_directory = './TIMIT'
-    _winlen = 0.025
-    _winstep = 0.001
+class DataLoader():
 
-    def __init__(self, path=None, stepsize=0.001):
-        current_dir = os.path.dirname(os.path.realpath(__file__))
-        self.cache_path = current_dir + '/../cache/'
+    def __init__(self, path, cache_dir=None, stepsize=0.001, winlen=0.025):
 
         self._winstep = stepsize
+        self._winlen = winlen
+        self._nfft = 512
         self.__main_directory = path + 'TIMIT/'
-        self.__data_directory = path + "TIMIT/dataset/"
+        self.__data_directory = self.__main_directory + "data/"
+        if cache_dir is None:
+            current_dir = os.path.dirname(os.path.realpath(__file__))
+            cache_dir = current_dir + '/../cache/'
+        self.cache_path = cache_dir
 
         # TimitBet 61 phoneme mapping to 39 phonemes
         # by Lee, K.-F., & Hon, H.-W. (1989). Speaker-independent phone recognition using hidden Markov models. IEEE Transactions on Acoustics, Speech, and Signal Processing, 37(11), 1641–1648. doi:10.1109/29.46546 
-        self.phon61_map39 = {
+        self.phone_map = {
             'iy': 'iy', 'ih': 'ih', 'eh': 'eh', 'ae': 'ae', 'ix': 'ih', 'ax': 'ah', 'ah': 'ah', 'uw': 'uw',
             'ux': 'uw', 'uh': 'uh', 'ao': 'aa', 'aa': 'aa', 'ey': 'ey', 'ay': 'ay', 'oy': 'oy', 'aw': 'aw',
             'ow': 'ow', 'l': 'l', 'el': 'l', 'r': 'r', 'y': 'y', 'w': 'w', 'er': 'er', 'axr': 'er',
             'm': 'm', 'em': 'm', 'n': 'n', 'nx': 'n', 'en': 'n', 'ng': 'ng', 'eng': 'ng', 'ch': 'ch',
-            'jh': 'jh', 'dh': 'dh', 'b': 'b', 'd': 'd', 'dx': 'dx', 'g': 'g', 'p': 'p', 't': 't',
+            'jh': 'jh', 'dh': 'dh', 'b': 'b', 'd': 'd', 'dx': 'dx', 'g': 'g', 'p_idx': 'p_idx', 't': 't',
             'k': 'k', 'z': 'z', 'zh': 'sh', 'v': 'v', 'f': 'f', 'th': 'th', 's': 's', 'sh': 'sh',
             'hh': 'hh', 'hv': 'hh', 'pcl': 'h#', 'tcl': 'h#', 'kcl': 'h#', 'qcl': 'h#', 'bcl': 'h#', 'dcl': 'h#',
-            'gcl': 'h#', 'h#': 'h#', '#h': 'h#', 'pau': 'h#', 'epi': 'h#', 'nx': 'n', 'ax-h': 'ah', 'q': 'h#'
+            'gcl': 'h#', 'h#': 'h#', '#h': 'h#', 'pau': 'h#', 'epi': 'h#', 'ax-h': 'ah', 'q': 'h#'
         }
 
-        self.phon61 = list(self.phon61_map39.keys())
+        self.phon61 = list(self.phone_map.keys())
 
-        self.phon39 = list(set(self.phon61_map39.values()))
+        self.phon39 = list(set(self.phone_map.values()))
         self.phon61.sort()
         self.phon39.sort()
 
@@ -55,102 +55,68 @@ class Feature_Collector():
             self.p61_label[i] = p
 
         self.phon39_map61 = {}
-        for p61, p39 in self.phon61_map39.items():
+        for p61, p39 in self.phone_map.items():
             if not p39 in self.phon39_map61:
                 self.phon39_map61[p39] = []
             self.phon39_map61[p39].append(p61)
 
         pkl.dump(self.label_p39, open(self.cache_path + 'phon_label_index.pkl', 'wb'))
-        pkl.dump(self.phon61_map39, open(self.cache_path + 'phon_map_61To39.pkl', 'wb'))
+        pkl.dump(self.phone_map, open(self.cache_path + 'phon_map_61To39.pkl', 'wb'))
 
     # ------------------------------------------------------------------------
-    def get39EquiOf61(self, p):
-        return self.phon61_map39[self.removePhonStressMarker(p)]
 
-    def get39Index(self, phon):
-        return self.label_p39[phon]
+    def get_39_from_61(self, p):
+        return self.phone_map[self.remove_stress_markers(p)]
 
-    def get39Phon(self, index):
-        return self.p39_label[index]
+    @staticmethod
+    def remove_stress_markers(phone):
+        phone = phone.replace('1', '')
+        phone = phone.replace('2', '')
+        return phone
 
-    def get61Index(self, phon):
-        return self.label_p61[phon]
-
-    def get61Phon(self, index):
-        return self.p61_label[index]
-
-    def removePhonStressMarker(self, phon):
-        phon = phon.replace('1', '')
-        phon = phon.replace('2', '')
-        return phon
-
-    def getWindow(self, sr):
+    def get_window(self, sr):
         """
         Compute converions for the MFFC 
         """
-        nfft = 512
-        winlen = self._winlen * sr
-        winstep = self._winstep * sr
-        return nfft, int(winlen), int(winstep)
+        return int(self._winlen * sr), int(self._winstep * sr)
 
-    def readTrainingDataDescriptionCSV(self, speakers=[], dr=[], sentence=""):
+    def read_descriptions(self, train_or_test="Train", speakers=[], dr=[], sentence=""):
         """
-        Read the relevant part of the training CSV
+        Read the relevant part of the testing or training CSV
         """
-        file_path = self.__main_directory + 'train_data.csv'  # check if train_data.csv is in correct path
-        self._Tdd = pd.read_csv(file_path)
-        # removing NaN entries in the train_data.csv file
+        file_path = self.__main_directory
+        file_path += 'test_data.csv' if train_or_test == "Test" else 'train_data.csv'
+        descriptions = pd.read_csv(file_path)
+
         if not dr:
             dr = ['DR1', 'DR2', 'DR3', 'DR4', 'DR5', 'DR6', 'DR7', 'DR8']
-        self._Tdd = self._Tdd[self._Tdd['dialect_region'].isin(dr)]
+        descriptions = descriptions[descriptions['dialect_region'].isin(dr)]
         if speakers != []:
-            self._Tdd = self._Tdd[self._Tdd['speaker_id'].isin(speakers)]
+            descriptions = descriptions[descriptions['speaker_id'].isin(speakers)]
         if sentence:
-            self._Tdd = self._Tdd[self._Tdd['filename'].str.contains(sentence)]
-        return self._Tdd
+            descriptions = descriptions[descriptions['filename'].str.contains(sentence)]
 
-    def readTestingDataDescriptionCSV(self, speakers=[], dr=[], sentence=""):
-        """
-        Read the relevant part of the testing CSV
-        """
-        file_path = self.__main_directory + 'test_data.csv'  # check if train_data.csv is in correct path
-        self._tdd = pd.read_csv(file_path)
-        if not dr:
-            dr = ['DR1', 'DR2', 'DR3', 'DR4', 'DR5', 'DR6', 'DR7', 'DR8']
-        self._tdd = self._tdd[self._tdd['dialect_region'].isin(dr)]
-        if speakers != []:
-            self._tdd = self._tdd[self._tdd['speaker_id'].isin(speakers)]
-        if sentence:
-            self._tdd = self._Tdd[self._Tdd['filename'].str.contains(sentence)]
-        return self._tdd
+        return descriptions
 
-    def getListAudioFiles(self, of='Train', speakers=[], dr=[], sentence=""):
+    def get_audio_file_names(self, of='Train', speakers=[], dr=[], sentence=""):
         """
         Returns the wav files from the CSV
         """
-        if of == 'Train':
-            self.readTrainingDataDescriptionCSV(speakers, dr, sentence=sentence)
-            return self._Tdd[self._Tdd['is_converted_audio'] == True]
-        if of == 'Test':
-            self.readTestingDataDescriptionCSV(speakers, dr, sentence=sentence)
-            return self._tdd[self._tdd['is_converted_audio'] == True]
+        descriptions = self.read_descriptions(of, speakers, dr, sentence=sentence)
+        return descriptions[descriptions['is_converted_audio'] == True]
 
-    def getListPhonemeFiles(self, of='Train'):
+    def get_transcription_file_names(self, of='Train'):
         """
         Returns the phoneme files from the CSV
         """
-        if of == 'Train':
-            self.readTrainingDataDescriptionCSV()
-            return self._Tdd[self._Tdd['is_phonetic_file'] == True]
-        if of == 'Test':
-            self.readTestingDataDescriptionCSV()
-            return self._tdd[self._tdd['is_phonetic_file'] == True]
+        descriptions = self.read_descriptions(of)
+        return descriptions[descriptions['is_phonetic_file'] == True]
 
-    def readAudio(self, fpath=None, pre_emp=False):
+    def read_audio(self, fpath=None, pre_emp=False):
         """
         Read an audio file
         """
-        if (fpath == None):
+        if fpath is None:
             return np.zeros(1), 0
         fpath = self.__data_directory + fpath
         if os.path.exists(fpath):
@@ -163,15 +129,15 @@ class Feature_Collector():
 
     # -----------------------end readAudio()
 
-    def getPhonPathFromAudioPath(self, audio_path):
+    def get_transcription_path_from_audio_path(self, audio_path):
         return audio_path.split(".WAV")[0] + ".PHN"
 
-    def readPhon(self, fpath=None):
+    def read_transcription(self, fpath=None):
         """
-        Read a phoneme annotations file
+        Read a transcriptions file
         """
-        if (fpath == None):
-            raise Exception('phon file path not provided')
+        if fpath is None:
+            raise Exception('phon file data_dir not provided')
 
         fpath = self.__data_directory + fpath
         ph_ = pd.read_csv(fpath, sep=" ")
@@ -193,17 +159,16 @@ class Feature_Collector():
         """
         if audio_path == None:
             raise Exception("Path to audio (Wav) file must be provided")
-        wav, sr = self.readAudio(fpath=audio_path, pre_emp=True)
-        nfft, winlen, winstep = self.getWindow(sr)
+        wav, sr = self.read_audio(fpath=audio_path, pre_emp=True)
+        winlen, winstep = self.get_window(sr)
         if (ftype == 'amplitudes'):
-            db_melspec = librosa.feature.melspectrogram(wav, sr=sr, hop_length=winstep, win_length=winlen, n_fft=nfft,
+            db_melspec = librosa.feature.melspectrogram(wav, sr=sr, hop_length=winstep, win_length=winlen,
+                                                        n_fft=self._nfft,
                                                         n_mels=n_mels)
 
         if (ftype == 'mfcc'):
             db_melspec = librosa.feature.mfcc(wav, sr=sr, hop_length=winstep, win_length=winlen, n_mfcc=n_mels)
 
-        mD = None
-        mDD = None
         if (delta):
             mD = librosa.feature.delta(db_melspec)
             db_melspec = np.concatenate([db_melspec, mD])
@@ -212,10 +177,10 @@ class Feature_Collector():
                 db_melspec = np.concatenate([db_melspec, mDD])
 
         audio_phon_transcription = None
-        if phon_path == None:
-            phon_path = self.getPhonPathFromAudioPath(audio_path)
+        if phon_path is None:
+            phon_path = self.get_transcription_path_from_audio_path(audio_path)
 
-        audio_phon_transcription = self.readPhon(phon_path)
+        audio_phon_transcription = self.read_transcription(phon_path)
 
         feature_vectors = []
         db_melspec = db_melspec.T
@@ -223,22 +188,13 @@ class Feature_Collector():
 
         labels = []
         for i in range(time):
-            # ---collecting feature---
+            # ---collecting p---
             feature_vectors.append(db_melspec[i])
 
             # ---collecting phoneme label ---
             start = winstep * i
             end = start + winlen
             index = start + int(winlen / 2)
-            # phoneme = list(
-            #             audio_phon_transcription[
-            #                 ((audio_phon_transcription['start']<=start) & 
-            #                 ((audio_phon_transcription['end']-start)>=int(winlen/2)))
-            #                 |
-            #                 ((audio_phon_transcription['start']<=end) & 
-            #                     (audio_phon_transcription['end']>end))  
-            #             ].to_dict()['phoneme'].values()
-            # )
             phoneme = list(
                 audio_phon_transcription[
                     (audio_phon_transcription['start'] <= index) &
@@ -250,7 +206,7 @@ class Feature_Collector():
                 if long_version:
                     phoneme = phoneme[0]
                 else:
-                    phoneme = self.get39EquiOf61(phoneme[0])
+                    phoneme = self.get_39_from_61(phoneme[0])
                 labels.append(phoneme)
             except:
                 labels.append('h#')
@@ -267,12 +223,11 @@ class Feature_Collector():
         oversamplings = 0
         if audio_path == None:
             raise Exception("Path to audio (Wav) file must be provided")
-        wav, sr = self.readAudio(fpath=audio_path, pre_emp=True)
+        wav, sr = self.read_audio(fpath=audio_path, pre_emp=True)
 
-        audio_phon_transcription = None
         if phon_path == None:
-            phon_path = self.getPhonPathFromAudioPath(audio_path)
-        audio_phon_transcription = self.readPhon(phon_path)
+            phon_path = self.get_transcription_path_from_audio_path(audio_path)
+        audio_phon_transcription = self.read_transcription(phon_path)
         split_wav = []
         labels = []
 
@@ -282,7 +237,7 @@ class Feature_Collector():
                 if long_version:
                     phoneme = row['phoneme']
                 else:
-                    phoneme = self.get39EquiOf61(row['phoneme'])
+                    phoneme = self.get_39_from_61(row['phoneme'])
             except:
                 phoneme = 'h#'
             labels.append(phoneme)
@@ -290,11 +245,9 @@ class Feature_Collector():
         feature_vectors = []
 
         for segment in split_wav:
-            _, winlen, winstep = self.getWindow(sr)
+            winlen, winstep = self.get_window(sr)
             db_melspec = librosa.feature.mfcc(segment, sr=sr, hop_length=winstep, win_length=winlen, n_mfcc=n_mels)
 
-            mD = None
-            mDD = None
             if (delta):
                 width = db_melspec.shape[1] + db_melspec.shape[1] % 2 - 1 if db_melspec.shape[1] < 9 else 9
                 mD = librosa.feature.delta(db_melspec, width=width)
@@ -360,7 +313,7 @@ class Feature_Collector():
             print('--- Failed')
             print('Collecting Features from Audio Files')
             # -------------
-            tddA = self.getListAudioFiles(ft, speakers=speakers, dr=dr, sentence=sentence)
+            tddA = self.get_audio_file_names(ft, speakers=speakers, dr=dr, sentence=sentence)
             tddA.index = range(tddA.shape[0])
             feature_vectors = []
             labels = []
@@ -425,7 +378,7 @@ class Feature_Collector():
             print('--- Failed')
             print('Collecting Features from Audio Files')
             # -------------
-            tddA = self.getListAudioFiles(ft, speakers, dr, sentence)
+            tddA = self.get_audio_file_names(ft, speakers, dr, sentence)
             tddA.index = range(tddA.shape[0])
             feature_vectors = []
             labels = []
