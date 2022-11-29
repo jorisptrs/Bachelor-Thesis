@@ -52,7 +52,7 @@ class ESN:
 
     def run_X(self, signal, t_washout, t_max):
         """
-        p (in_dim x t_max)
+        p_idx (in_dim x t_max)
         """
         np.random.seed(1)
         L = max(0, t_max - t_washout)  # steps after washout
@@ -76,7 +76,7 @@ class ESN:
 
     def run(self, signal, XorZ="Z"):
         """
-        p (in_dim x t_max)
+        p_idx (in_dim x t_max)
         """
         np.random.seed(1)
         t_max = signal.shape[1]

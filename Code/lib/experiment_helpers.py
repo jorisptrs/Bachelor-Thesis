@@ -41,21 +41,31 @@ def save_to_cache(file_name, data):
     fp.close()
 
 
-def compute_Cs(group=None, esn=None, aperture="auto", normalize=True, XorZ="X", cache=True, file_identifier=""):
+def compute_Cs(group=None, signals=None, esn=None, aperture="auto", normalize=True, XorZ="X", cache=True, file_identifier=""):
     Cs = False
+    if signals is None:
+        signals = group.values()
     if cache:
-        file_name = file_identifier + XorZ + str(aperture) + str(esn.esn_params) + str(len(list(group.keys()))) + str(
-            len(list(group.values())[0])) + "Cs"
+        file_name = file_identifier + XorZ + str(aperture) + str(esn.esn_params) + str(len(list(signals))) + str(
+            len(list(signals)[0])) + "ps"
         Cs = try_reading_from_cache(file_name)
     if not Cs:
         print("- computing conceptors")
         Cs = []
-        for _, signals in group.items():
-            X = run_all(esn, signals, XorZ)
-            if aperture == "auto":
-                Cs.append(compute_c(X, 1))
-            else:
-                Cs.append(compute_c(X, aperture))
+        if group is None:
+            for signal in signals:
+                X = esn.run(signal.T, XorZ=XorZ)
+                if aperture == "auto":
+                    Cs.append(compute_c(X, 1))
+                else:
+                    Cs.append(compute_c(X, aperture))
+        else:
+            for _, signals in group.items():
+                X = run_all(esn, signals, XorZ)
+                if aperture == "auto":
+                    Cs.append(compute_c(X, 1))
+                else:
+                    Cs.append(compute_c(X, aperture))
         if aperture == "auto":
             print("optimizing")
             Cs = optimize_apertures(Cs, start=0.5, end=500, n=150)
@@ -73,7 +83,7 @@ def compute_Cs_from_X_list(X_list, aperture="auto"):
     Cs = False
     if cache:
         file_name = file_identifier + XorZ + str(aperture) + str(esn.esn_params) + str(len(list(group.keys()))) + str(
-            len(list(group.values())[0])) + "Cs"
+            len(list(group.values())[0])) + "ps"
         Cs = try_reading_from_cache(file_name)
     if not Cs:
         print("- computing conceptors")

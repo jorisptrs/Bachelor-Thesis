@@ -150,7 +150,7 @@ def Ns_from_Cs(Cs):
 # Evaluation
 def combined_evidence(point, Cs, idx):
     """
-    Returns combined evidence that a state point corresponds to the conceptor Cs[idx]
+    Returns combined evidence that a state point corresponds to the conceptor ps[idx]
     """
     # positive evidence
     e_pos = np.array(point).T @ Cs[idx] @ point

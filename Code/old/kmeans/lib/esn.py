@@ -51,7 +51,7 @@ class ESN:
 
     def run(self, signal, t_washout):
         """
-        p (in_dim x t_max)
+        p_idx (in_dim x t_max)
         """
         t_max = signal.shape[0]
         L = max(0, t_max - t_washout)  # steps after washout

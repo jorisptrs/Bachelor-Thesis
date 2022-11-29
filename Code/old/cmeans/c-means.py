@@ -193,7 +193,7 @@ def compute_memberships(X, Cs):
     nb_points = X.shape[1]
     assignments = [[] for _ in Cs]
     for t in range(nb_points):
-        # e_by_C = normalized_evidences_by_conceptor(X[:,t], Cs)
+        # e_by_C = normalized_evidences_by_conceptor(X[:,t], ps)
         e_by_C = best_mus(X[:, t], Cs)
         for i in range(len(assignments)):
             assignments[i].append(e_by_C[i])
@@ -229,13 +229,13 @@ def cmeans(X, nb_conceptors, method, limits, aperture, max_epochs=100, plot_prog
         plot.add_new_assignment_plot(get_assignments(cuts, c_map), label="C")
 
         Cs = [compute_c(X, aperture, assignments) for assignments in new_assignments]
-        # Cs = optimize_apertures(Cs)
+        # ps = optimize_apertures(ps)
         Cs = normalize_apertures(Cs)
 
         if plot_progress:
             plot.add_new_assignment_plot(new_assignments, "", True)
 
-            # plot.add_new_conceptors_fit_plot(X, Cs, "K-means epoch:"+str(epoch)+", C")
+            # plot.add_new_conceptors_fit_plot(X, ps, "K-means epoch:"+str(epoch)+", C")
         # recompute assignments by find the closest conceptor for each of the state points
         old_assignments = new_assignments.copy()
 

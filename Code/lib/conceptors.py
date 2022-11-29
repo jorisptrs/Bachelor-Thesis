@@ -129,7 +129,7 @@ def adapt_singular_vals_of_Cs(Cs, target_sum, epsilon=0.01):
 
 def normalize_apertures(Cs, target_sum=None):
     """
-    Normalize all conceptors in Cs to have equal summed singular values
+    Normalize all conceptors in ps to have equal summed singular values
     """
     if target_sum == None:
         target_sum = np.mean([sum_of_singular_vals(C) for C in Cs])
@@ -144,7 +144,7 @@ def optimize_apertures(Cs, start=0.5, end=1000, n=150):
     normalized_Cs = []
     print("Computing gammas...")
     for i, C in enumerate(Cs):
-        #print(i + 1, " of ", len(Cs))
+        #print(i + 1, " of ", len(ps))
         gammas.append(best_gamma(C, start, end, n))
     optimal_gamma = np.mean(gammas)
     print("Optimal gamma: ", optimal_gamma)
@@ -294,7 +294,7 @@ def evidences_for_Cs_z(z, Cs, Ns):
 
 def combined_evidence(point, Cs, idx):
     """
-    Returns combined evidence that a state point corresponds to the conceptor Cs[idx]
+    Returns combined evidence that a state point corresponds to the conceptor ps[idx]
     """
     # positive evidence
     e_pos = np.array(point).T @ Cs[idx] @ point

@@ -170,8 +170,8 @@ def kmeans(X, nb_conceptors, method, limits, aperture, max_epochs=100, plot_prog
         print("epoch:", epoch)
         # recompute centroids based on subset of assigned state
         Cs = [compute_c(X[:, assignments], aperture) for assignments in new_assignments]
-        # Cs = normalize_apertures(Cs)
-        # Cs = optimize_apertures(Cs)
+        # ps = normalize_apertures(ps)
+        # ps = optimize_apertures(ps)
 
         if plot_progress:
             plot.add_new_conceptors_fit_plot(X, Cs, "K-means epoch:" + str(epoch) + ", C")

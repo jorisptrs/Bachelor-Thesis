@@ -51,7 +51,7 @@ class Plot:
 
     def add_new_conceptors_fit_plot(self, X, Cs, label):
         """
-        Plots, for each time step t, how well each conceptor in Cs matches the state x(t)
+        Plots, for each time step t, how well each conceptor in ps matches the state x(t)
         """
         self.inc()
         collection, _ = test(X, Cs, "PROP")
