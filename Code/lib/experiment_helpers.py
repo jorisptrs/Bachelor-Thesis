@@ -22,7 +22,7 @@ def try_reading_from_cache(file_name):
     cache_path = current_dir + '/../cache/'
 
     if os.path.exists(cache_path + file_name + '.pkl'):
-        print("- loading conceptors from file")
+        print("- loading from file")
         fp = open(cache_path + file_name + '.pkl', 'rb')
         data = pkl.load(fp)
         fp.close()
@@ -30,7 +30,7 @@ def try_reading_from_cache(file_name):
         gc.collect()
         return data
     else:
-        return False
+        return None
 
 
 def save_to_cache(file_name, data):

@@ -117,5 +117,7 @@ def get_heat_map(ps, sim_func):
             heat_map[x, y] = sim
             heat_map[y, x] = sim
 
+    return heat_map
+
 def silh(Cs, assignments):
     return np.mean([ silh_aux(x, Cs, assingments) for x in range(len(Cs)) ])
