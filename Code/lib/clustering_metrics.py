@@ -62,6 +62,7 @@ def TPFN(assignments, correct_assignments):
         TPFN += math.comb(len(assignment), 2)
     return TPFN
 
+
 def prc(assignments, correct_assignments):
     return TP(assignments, correct_assignments) / TPFP(assignments, correct_assignments)
 
@@ -96,6 +97,7 @@ def F(assignments, correct_assignments):
 
     return cnt / max([max(ass) for ass in assignments if ass != []])
 
+
 def silh_aux(x, Cs, assignments):
     a = 0
     b = 0
@@ -108,16 +110,18 @@ def silh_aux(x, Cs, assignments):
             b = min(b, mean_dist_to_cluster(x, Cs, assignment))
     return (b - a) / max(a, b)
 
-def get_heat_map(ps, sim_func):
+
+def get_heat_map(ps, sim_func, zero_diag=True):
     heat_map = np.zeros((len(ps), len(ps)))
 
     for x in range(len(ps)):
-        for y in range(0, x + 1):
+        for y in range(0, x+(not zero_diag)):
             sim = sim_func(ps[x], ps[y])
             heat_map[x, y] = sim
             heat_map[y, x] = sim
 
     return heat_map
 
+
 def silh(Cs, assignments):
-    return np.mean([ silh_aux(x, Cs, assingments) for x in range(len(Cs)) ])
+    return np.mean([silh_aux(x, Cs, assingments) for x in range(len(Cs))])
