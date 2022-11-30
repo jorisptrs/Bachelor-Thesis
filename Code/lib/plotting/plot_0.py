@@ -2,7 +2,8 @@ from math import floor
 
 import matplotlib.pyplot as plt
 from lib.conceptors import *
-from lib.helpers import *
+from experiments.helpers.math_helpers import *
+from lib.plotting.plotting_helpers import smoothed
 
 """
 Problem-specific plotting

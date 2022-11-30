@@ -2,7 +2,6 @@ from math import floor
 
 import matplotlib.pyplot as plt
 from lib.conceptors import *
-from lib.helpers import *
 
 """
 Problem-specific plotting
