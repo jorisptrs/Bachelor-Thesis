@@ -1,4 +1,4 @@
-code/dataset/TIMIT
+TIMIT
 *.ipynb_checkpoints/
 __pycache__/
 *.pyc
