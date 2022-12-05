@@ -1,11 +1,10 @@
 import numpy as np
 import random
 import os, sys
-import matplotlib.pyplot as plt
 import warnings
 
-directory = os.path.abspath('/Users/joris/Documents/Work/bsc ai/bt/Bachelor-Thesis/code')
-sys.path.append(directory)
+from matplotlib import pyplot as plt
+
 from lib.esn import ESN
 from dataset.loading import DataLoader
 
@@ -13,8 +12,11 @@ random.seed(0)
 np.random.seed(0)
 warnings.filterwarnings("ignore")
 
-path = '../../data/'
-fc = DataLoader(path)
+directory = os.path.abspath('/Users/joris/Documents/Work/bsc ai/bt/Bachelor-Thesis/code')
+sys.path.append(directory)
+
+data_path = '../../../'
+dl = DataLoader(data_path)
 
 dr = []
 speakers = []
@@ -26,7 +28,8 @@ delta_delta = False
 subsamples = 10
 const_params = {
     "n_mels": n_mels,
-    "XorZ": XorZ
+    "XorZ": XorZ,
+    "N": 100
 }
 
 path_option = "Final" + str(long_version) + str(n_mels) + str(delta) + str(delta_delta) + str(subsamples)
@@ -36,14 +39,14 @@ if dr:
 if len(speakers):
     path_option = str(speakers[0]) + "_" + path_option
 
-features_train, labels_train, _ = fc.collectFeaturesInSegments(
+features_train, labels_train, _ = dl.collectFeaturesInSegments(
     n_mels=n_mels, delta=delta, delta_delta=delta_delta,
     long_version=long_version, speakers=speakers, dr=dr,
     subsamples=subsamples, path_option=path_option)
 
 from dataset.data_processing import *
 
-phonemes, features_train, labels_train = filter_data(features_train, labels_train, limit=None)
+phonemes, features_train, labels_train = filter_data(features_train, labels_train, limit=2000)
 
 from experiments.helpers.experiment_helpers import *
 from sklearn.base import BaseEstimator, ClassifierMixin
@@ -93,83 +96,58 @@ class Classifier(BaseEstimator, ClassifierMixin):
         y = []
         for sample in X:
             x = self.esn.run(sample.T, XorZ=self.XorZ)
-            es = evidences_for_Cs(x, self.Cs_clas, self.Ns_clas, XorZ == "X")
+            es = evidences_for_Cs(x, self.Cs_clas, self.Ns_clas)
+            if self.XorZ == "X":
+                es = [np.sum(p) for p in es]
             y.append(self.classes[np.argmax(es)])
 
         return y
+# Old params:
+#opt = Classifier(1.5, .2, 1.5, .1) # Z optimal params
+
+#clas = Classifier(1.1, .44, 2.57, .1)
+
+clas = Classifier(
+    1.1, .8, 2.57, .1
+)
+
+clas.fit(features_train, labels_train, **{
+    "n_mels":n_mels,
+    "XorZ":'X',
+    "N": 100
+})
+
+# Method "Z
+# optz = Classifier(1.5,
+#     .2,
+#     1.5,
+#     .1)
+#
+# optz.fit(features_train, labels_train, **{
+#     "n_mels":n_mels,
+#     "XorZ":"Z"
+# })
+
+# Scikitlearn
 
 
-from sklearn.model_selection import train_test_split
-from bayes_opt import BayesianOptimization
+#opt = Classifier()
+#opt = BayesSearchCV(Classifier(), parameters, n_iter=50, cv=3)
+#opt.fit(features, labels, **{
+#    "in_dim":n_mels,
+#    "out_dim":n_mels
+#})
+#print(opt.score(fv, lv))
+#print(opt.best_params_)
 
-X_train, X_test, y_train, y_test = train_test_split(features_train,
-                                                    labels_train,
-                                                    stratify=labels_train,
-                                                    random_state=1)
+print("Testing...")
 
+features_test, labels_test, _ = dl.collectFeaturesInSegments(
+    ft='Test',n_mels=n_mels,delta=delta,delta_delta=delta_delta,
+    long_version=long_version,speakers=[],dr=dr,sentence=[],
+    subsamples=subsamples,path_option=path_option+"_test")
 
-# Bayesian Optimization wrapper
-def objective_function(W_in_scale,
-                       b_scale,
-                       spectral_radius,
-                       weights):
-    model = Classifier(W_in_scale,
-                       b_scale,
-                       spectral_radius,
-                       weights)
-    model.fit(X_train, y_train, **const_params)
-    return model.score(X_test, y_test)
+_, features_test, labels_test = filter_data(features_test, labels_test, limit=None)
 
-
-parameters = {
-    'W_in_scale': [.01, 2],
-    'spectral_radius': [0.01, 4],
-    'b_scale': [0, 2],
-    'weights': [.01, 1]
-}
-
-# Bayesian optimization of the objective function.
-optimizer = BayesianOptimization(f=objective_function,
-                                 pbounds=parameters,
-                                 random_state=0)
-optimizer.maximize(init_points=10, n_iter=50)
-
-best_params = optimizer.max['params']
-print(f"Best parmaters: {best_params}; f(x) = {optimizer.max['target']}.")
-
-plt.rcParams['text.usetex'] = True
-fig, ax1 = plt.subplots(figsize=(15, 5))
-
-ax2 = ax1.twinx()
-
-# Scores:
-ax1.plot(range(1, 1 + len(optimizer.space.target)), optimizer.space.target, color='r',
-         label="Accuracy - $f(\\rho$, $k_{W^in}$, $k_b$, $r$)")
-
-# Parameters
-W_in_scale = []
-b_scale = []
-spectral_radius = []
-weights = []
-
-p = 'run1'
-pkl.dump(optimizer, open(p + '.pkl', 'wb'))
-
-for res in optimizer.res:
-    W_in_scale.append(res["params"]["W_in_scale"])
-    b_scale.append(res["params"]["b_scale"])
-    spectral_radius.append(res["params"]["spectral_radius"])
-    weights.append(res["params"]["weights"])
-
-if True:
-    ax1.plot(range(1, 1 + len(optimizer.space.target)), W_in_scale, "--", label="$W^in$")
-    ax1.plot(range(1, 1 + len(optimizer.space.target)), b_scale, "--", label="$k_b$")
-    ax1.plot(range(1, 1 + len(optimizer.space.target)), spectral_radius, "--", label="$r$")
-    ax1.plot(range(1, 1 + len(optimizer.space.target)), weights, "--", label="$\\rho$")
-
-ax1.set_xlabel('Iteration', fontsize=20)
-ax1.set_ylabel('Accuracy', color="r", fontsize=20)
-ax2.set_ylabel('Hyperparameter value', fontsize=20)
-
-ax1.legend(loc="upper left", fontsize=20)
-fig.show()
+print(f'Training Accuracy : {clas.score(features_train, labels_train)}')
+print(f'Test Accuracy     : {clas.score(features_test, labels_test)}')

@@ -81,27 +81,25 @@ class ESN:
         np.random.seed(1)
         t_max = signal.shape[1]
         if XorZ == "Z":
-            Z = np.zeros((t_max * (self.N + signal.shape[0]), 1))
-            x = np.random.normal(0, 1, (self.N, 1))
-
-            for t in range(t_max):
-                p = signal[:, t].reshape((self.in_dim, 1))
-                x = np.tanh(np.dot(self.W, x) + np.dot(self.W_in, p) + self.b)
-                Z[t * (self.N + signal.shape[0]):t * (self.N + signal.shape[0]) + p.shape[0]] = p
-                Z[t * (self.N + signal.shape[0]) + p.shape[0]:t * (self.N + p.shape[0]) + p.shape[0] + x.shape[0]] = x
-            return Z
+            X = np.zeros((t_max * (self.N + signal.shape[0]), 1))
         else:
             X = np.zeros((self.N, t_max))
-            x = np.random.normal(0, 1, (self.N, 1))
 
-            for t in range(t_max):
-                if signal.ndim == 1:
-                    p = signal[t].reshape((self.in_dim, 1))
-                else:
-                    p = signal[:, t].reshape((self.in_dim, 1))
-                x = np.tanh(np.dot(self.W, x) + np.dot(self.W_in, p) + self.b)
+        x = np.random.normal(0, 1, (self.N, 1))
+
+        for t in range(t_max):
+            if signal.ndim == 1:
+                p = signal[t].reshape((self.in_dim, 1))
+            else:
+                p = signal[:, t].reshape((self.in_dim, 1))
+            x = np.tanh(np.dot(self.W, x) + np.dot(self.W_in, p) + self.b)
+            if XorZ == "Z":
+                X[t * (self.N + signal.shape[0]):t * (self.N + signal.shape[0]) + p.shape[0]] = p
+                X[t * (self.N + signal.shape[0]) + p.shape[0]:t * (self.N + p.shape[0]) + p.shape[0] + x.shape[0]] = x
+            else:
                 X[:, t] = x[:, 0]
-            return X
+        return X
+
 
     def load(self, X, X_delay, reg_W):
         """
