@@ -110,28 +110,36 @@ def sum_of_singular_vals(C):
     return np.sum(s)
 
 
-def adapt_singular_vals(C, target_sum, epsilon):
+def adapt_singular_vals(C, target_sum, epsilon, debug=False):
+    sss = []
     for i in range(50):
         ss = sum_of_singular_vals(C)
-        if abs(ss-target_sum) < epsilon:
+        sss.append(ss)
+        if abs(ss - target_sum) < epsilon:
             break
         gamma = target_sum / sum_of_singular_vals(C)
         C = phi(C, gamma=gamma)
-    return C
+    return C if not debug else C, sss
 
 
-def adapt_singular_vals_of_Cs(Cs, target_sum, epsilon=0.01):
+def adapt_singular_vals_of_Cs(Cs, target_sum, epsilon=0.01, debug=False):
     normalized_Cs = []
+    ss_list = []
     for C in Cs:
-        normalized_C = adapt_singular_vals(C,target_sum,epsilon=epsilon)
+        if debug:
+            normalized_C, ss = adapt_singular_vals(C, target_sum, epsilon=epsilon, debug=debug)
+            ss_list.append(ss)
+        else:
+            normalized_C = adapt_singular_vals(C, target_sum, epsilon=epsilon, debug=debug)
         normalized_Cs.append(normalized_C)
-    return normalized_Cs
+    return normalized_Cs if not debug else normalized_Cs, ss_list
+
 
 def normalize_apertures(Cs, target_sum=None):
     """
     Normalize all conceptors in ps to have equal summed singular values
     """
-    if target_sum == None:
+    if target_sum is None:
         target_sum = np.mean([sum_of_singular_vals(C) for C in Cs])
     st = np.std([sum_of_singular_vals(C) for C in Cs])
     print("Target: ", target_sum)
@@ -139,12 +147,12 @@ def normalize_apertures(Cs, target_sum=None):
     return adapt_singular_vals_of_Cs(Cs, target_sum)
 
 
-def optimize_apertures(Cs, start=0.5, end=1000, n=150):
+def optimize_apertures(Cs, start=0.5, end=1000, n=150, debug=False):
     gammas = []
     normalized_Cs = []
     print("Computing gammas...")
     for i, C in enumerate(Cs):
-        #print(i + 1, " of ", len(ps))
+        # print(i + 1, " of ", len(ps))
         gammas.append(best_gamma(C, start, end, n))
     optimal_gamma = np.mean(gammas)
     print("Optimal gamma: ", optimal_gamma)
@@ -171,8 +179,9 @@ def phi_squared(gamma, C):
 def best_gamma(C, start=0.5, end=1000, n=200):
     ds = []
     exponents = np.linspace(np.log2(start), np.log2(end), n)
-    gammas = [ 2 ** exponent for exponent in exponents ]
-    #gammas = np.linspace(start, end, n)
+    gammas = [2 ** exponent for exponent in exponents]
+    # epsilon = 1e-5
+    # gammas = np.linspace(start, end, n)
 
     for i in range(len(gammas) - 1):
         dgamma = gammas[i + 1] - gammas[i]
@@ -273,6 +282,7 @@ def evidences_for_Cs(X, Cs, Ns, two_d=True):
     if two_d:
         es = [np.sum(e) for e in es]
     return es
+
 
 def combined_evidence_vec_z(z, Cs, idx, Ns=None):
     """

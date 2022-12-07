@@ -8,6 +8,7 @@ import numpy as np  # linear algebra
 import pandas as pd  # dataset processing, CSV file I/O (e.g. pd.read_csv)
 from scipy.interpolate import CubicSpline
 
+# Inspired by https://www.kaggle.com/code/reganmaharjan/phoneme-recognition-using-hmm-on-timit
 
 class DataLoader():
 
@@ -30,12 +31,14 @@ class DataLoader():
             'ux': 'uw', 'uh': 'uh', 'ao': 'aa', 'aa': 'aa', 'ey': 'ey', 'ay': 'ay', 'oy': 'oy', 'aw': 'aw',
             'ow': 'ow', 'l': 'l', 'el': 'l', 'r': 'r', 'y': 'y', 'w': 'w', 'er': 'er', 'axr': 'er',
             'm': 'm', 'em': 'm', 'n': 'n', 'nx': 'n', 'en': 'n', 'ng': 'ng', 'eng': 'ng', 'ch': 'ch',
-            'jh': 'jh', 'dh': 'dh', 'b': 'b', 'd': 'd', 'dx': 'dx', 'g': 'g', 'p_idx': 'p_idx', 't': 't',
+            'jh': 'jh', 'dh': 'dh', 'b': 'b', 'd': 'd', 'dx': 'dx', 'g': 'g', 'p': 'p', 't': 't',
             'k': 'k', 'z': 'z', 'zh': 'sh', 'v': 'v', 'f': 'f', 'th': 'th', 's': 's', 'sh': 'sh',
-            'hh': 'hh', 'hv': 'hh', 'pcl': 'h#', 'tcl': 'h#', 'kcl': 'h#', 'qcl': 'h#', 'bcl': 'h#', 'dcl': 'h#',
-            'gcl': 'h#', 'h#': 'h#', '#h': 'h#', 'pau': 'h#', 'epi': 'h#', 'ax-h': 'ah', 'q': 'h#'
+            'hh': 'hh', 'hv': 'hh', 'pcl': 'h#', 'tcl': 'h#', 'kcl': 'h#', 'bcl': 'h#', 'dcl': 'h#',
+            'gcl': 'h#', 'h#': 'h#', 'pau': 'h#', 'epi': 'h#', 'ax-h': 'ah', 'q': 'h#'
         }
 
+        self.d = {}
+        self.checker = list(self.phone_map.keys())
         self.phon61 = list(self.phone_map.keys())
 
         self.phon39 = list(set(self.phone_map.values()))
@@ -203,10 +206,9 @@ class DataLoader():
             )
 
             try:
-                if long_version:
-                    phoneme = phoneme[0]
-                else:
-                    phoneme = self.get_39_from_61(phoneme[0])
+                phoneme = phoneme[0]
+                if not long_version:
+                    phoneme = self.get_39_from_61(phoneme)
                 labels.append(phoneme)
             except:
                 labels.append('h#')
@@ -221,11 +223,11 @@ class DataLoader():
         - feature_vectors: all corresponding sections of the signal
         """
         oversamplings = 0
-        if audio_path == None:
+        if audio_path is None:
             raise Exception("Path to audio (Wav) file must be provided")
         wav, sr = self.read_audio(fpath=audio_path, pre_emp=True)
 
-        if phon_path == None:
+        if phon_path is None:
             phon_path = self.get_transcription_path_from_audio_path(audio_path)
         audio_phon_transcription = self.read_transcription(phon_path)
         split_wav = []
@@ -234,10 +236,14 @@ class DataLoader():
         for _, row in audio_phon_transcription.iterrows():
             split_wav.append(wav[row['start']:row['end']])
             try:
-                if long_version:
-                    phoneme = row['phoneme']
-                else:
-                    phoneme = self.get_39_from_61(row['phoneme'])
+                phoneme = row['phoneme']
+                if not long_version:
+                    phoneme = self.get_39_from_61(phoneme)
+                if phoneme not in list(self.d.keys()):
+                    self.d[phoneme] = []
+                self.d[phoneme].append(row['phoneme'])
+                if row['phoneme'] in self.checker:
+                    self.checker.remove(row['phoneme'])
             except:
                 phoneme = 'h#'
             labels.append(phoneme)
@@ -382,6 +388,7 @@ class DataLoader():
             tddA.index = range(tddA.shape[0])
             feature_vectors = []
             labels = []
+
             print(tddA.shape[0])
             for i in range(tddA.shape[0]):
                 if not i % 100:
