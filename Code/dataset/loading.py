@@ -36,11 +36,7 @@ class DataLoader():
             'hh': 'hh', 'hv': 'hh', 'pcl': 'h#', 'tcl': 'h#', 'kcl': 'h#', 'bcl': 'h#', 'dcl': 'h#',
             'gcl': 'h#', 'h#': 'h#', 'pau': 'h#', 'epi': 'h#', 'ax-h': 'ah', 'q': 'h#'
         }
-
-        self.d = {}
-        self.checker = list(self.phone_map.keys())
         self.phon61 = list(self.phone_map.keys())
-
         self.phon39 = list(set(self.phone_map.values()))
         self.phon61.sort()
         self.phon39.sort()
@@ -239,11 +235,6 @@ class DataLoader():
                 phoneme = row['phoneme']
                 if not long_version:
                     phoneme = self.get_39_from_61(phoneme)
-                if phoneme not in list(self.d.keys()):
-                    self.d[phoneme] = []
-                self.d[phoneme].append(row['phoneme'])
-                if row['phoneme'] in self.checker:
-                    self.checker.remove(row['phoneme'])
             except:
                 phoneme = 'h#'
             labels.append(phoneme)
@@ -273,27 +264,6 @@ class DataLoader():
         return feature_vectors, labels, oversamplings
 
     # --------------------end getMelSpectrogramFeatureAndLabel()
-    def label_to_1hot(self, l, long_version=False):
-        """
-        Converts a label to an 1-hot encoded array 
-        """
-        label = [0 for i in range(63 if long_version else 39)]
-        if long_version:
-            label[self.label_p61[l] - 1] = 1
-        else:
-            label[self.label_p39[l] - 1] = 1
-        return np.array(label)
-
-    def labels_to_1hot(self, labels, long_version=False):
-        """
-        Converts a list of labels to 1-hot encodings
-        """
-        print('Preparing Labels')
-        label_vector = []
-        for l in labels:
-            label_vector.append(self.label_to_1hot(l, long_version))
-
-        return label_vector
 
     def collectFeatures(self, ft='Train', ftype='mfcc', n_mels=128, delta=False, delta_delta=False,
                         normalize=True, long_version=False, speakers=[], dr=[], sentence=[], n=0, path_option=""):
