@@ -119,7 +119,7 @@ def adapt_singular_vals(C, target_sum, epsilon, debug=False):
             break
         gamma = target_sum / sum_of_singular_vals(C)
         C = phi(C, gamma=gamma)
-    return C if not debug else C, sss
+    return (C, sss) if debug else C
 
 
 def adapt_singular_vals_of_Cs(Cs, target_sum, epsilon=0.01, debug=False):
@@ -132,10 +132,10 @@ def adapt_singular_vals_of_Cs(Cs, target_sum, epsilon=0.01, debug=False):
         else:
             normalized_C = adapt_singular_vals(C, target_sum, epsilon=epsilon, debug=debug)
         normalized_Cs.append(normalized_C)
-    return normalized_Cs if not debug else normalized_Cs, ss_list
+    return (normalized_Cs, ss_list) if debug else normalized_Cs
 
 
-def normalize_apertures(Cs, target_sum=None):
+def normalize_apertures(Cs, target_sum=None, debug=False):
     """
     Normalize all conceptors in ps to have equal summed singular values
     """
@@ -144,7 +144,8 @@ def normalize_apertures(Cs, target_sum=None):
     st = np.std([sum_of_singular_vals(C) for C in Cs])
     print("Target: ", target_sum)
     print("std", st)
-    return adapt_singular_vals_of_Cs(Cs, target_sum)
+    Cs = adapt_singular_vals_of_Cs(Cs, target_sum)
+    return (Cs, target_sum) if debug else Cs
 
 
 def optimize_apertures(Cs, start=0.5, end=1000, n=150, debug=False):
@@ -158,7 +159,7 @@ def optimize_apertures(Cs, start=0.5, end=1000, n=150, debug=False):
     print("Optimal gamma: ", optimal_gamma)
     for i, C in enumerate(Cs):
         normalized_Cs.append(phi(C, gamma=optimal_gamma, R=None))
-    return normalized_Cs
+    return (normalized_Cs, optimal_gamma) if debug else normalized_Cs
 
 
 def phi(C=None, gamma=1.0, R=None):
