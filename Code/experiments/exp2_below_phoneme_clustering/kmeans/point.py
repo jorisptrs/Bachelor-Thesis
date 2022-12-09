@@ -2,6 +2,12 @@ import numpy as np
 
 
 class Point:
+    """
+    This class defines a point used by experiment 2. Points are either data points or centroids.
+    Since centroids are, depending on the clustering method, defined in similar spaces as their data points
+    (conceptor space, reservoir state space, mfcc space), they are both represented by this same class.
+    """
+
     def __init__(self, signal=None, esn_state=None, C=None, N=None):
         self.signal = signal
         self.esn_state = esn_state
@@ -9,6 +15,9 @@ class Point:
         self.N = N
 
     def __eq__(self, other):
+        """
+        True if the two points are equal.
+        """
         return np.array_equal(self.signal, other.signal) \
                and np.array_equal(self.esn_state, other.esn_state) \
                and np.array_equal(self.C, other.C) \

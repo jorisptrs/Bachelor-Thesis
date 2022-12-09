@@ -2,10 +2,14 @@ from enum import Enum
 
 
 class Method(Enum):
-    OG_SIGNALS = 1
-    CENTROIDS = 2
-    SIMS = 3
-    PRED = 4
+    """
+    The possible methods for clustering. They affect the centroid computation and the cluster assignment steps.
+    """
+
+    OG_SIGNALS = 1 # Mean signals centroids & euclidian distance function (applied pairwise to corresponding timesteps)
+    CENTROIDS = 2 # Mean reservoir state centroids & euclidian distance function (applied pairwise to corresponding timesteps) (TODO: give a more intuitive name)
+    SIMS = 3 # Conceptor centroids & conceptor similarity-based distance function
+    PRED = 4 # Conceptor centroids & evidence distance function
     PRED_CENTROIDS = 5
 
     def is_in_conceptor_space(self):

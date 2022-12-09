@@ -2,6 +2,8 @@ import math
 
 import numpy as np
 
+from experiments.exp2_below_phoneme_clustering.kmeans.kmeans import KMeans
+
 
 def I(assignments, correct_assignments):
     I_res = 0
@@ -33,6 +35,10 @@ def NMI(assignments, correct_assignments):
     return 2 * Is / (Ha + Hc)
 
 
+def NMIs_from_list(assignment_list, correct_assignments):
+    return [ NMI(a, correct_assignments) for a in assignment_list ]
+
+
 def best_match(assignments, correct_assignments):
     max_matches = 0
     overlaps = np.zeros((len(correct_assignments), 1))
@@ -41,7 +47,6 @@ def best_match(assignments, correct_assignments):
             if assignment in correct_assignment:
                 overlaps[i] += 1
     return np.argmax(overlaps), np.max(overlaps)
-
 
 def TP(assignments, correct_assignments):
     tp = 1
@@ -98,18 +103,30 @@ def F(assignments, correct_assignments):
     return cnt / max([max(ass) for ass in assignments if ass != []])
 
 
-def silh_aux(x, Cs, assignments):
-    a = 0
-    b = 0
-    for assignment in assignments:
-        if x in assingment:
-            if len(assignment) == 1:
-                return 0
-            a = mean_dist_to_cluster(x, Cs, assignment)
-        else:
-            b = min(b, mean_dist_to_cluster(x, Cs, assignment))
-    return (b - a) / max(a, b)
+class Silhouette:
+    def __init__(self, km):
+        self.km = km
 
+    def silh_aux(self, point, clusters):
+        a = 0
+        b = 0
+        for i, cluster in enumerate(clusters):
+            dist = self.km.distance_to_centroid(point, centroid=self.km.centroids[i])
+            if point in cluster:
+                if len(cluster) == 1:
+                    return 0
+                a = dist
+            else:
+                b = dist if not b else min(b, dist)
+        return (b - a) / max(a, b)
+
+    def simpl_silh(self, clusters):
+        clusters = self.km.remove_empty_clusters(clusters)
+        self.km.compute_centroids(clusters)
+        return np.mean([self.silh_aux(point, clusters=clusters) for point in self.km.points])
+
+    def simpl_silh_from_list(self, cluster_hist):
+        return [ self.simpl_silh(cluster) for cluster in cluster_hist ]
 
 def get_heat_map(ps, sim_func, zero_diag=True):
     heat_map = np.zeros((len(ps), len(ps)))
@@ -121,7 +138,3 @@ def get_heat_map(ps, sim_func, zero_diag=True):
             heat_map[y, x] = sim
 
     return heat_map
-
-
-def silh(Cs, assignments):
-    return np.mean([silh_aux(x, Cs, assingments) for x in range(len(Cs))])

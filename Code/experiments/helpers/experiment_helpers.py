@@ -17,7 +17,7 @@ def compute_Cs_and_Ns(group, esn, aperture="auto", normalize=True, XorZ="X", cac
 
 def try_reading_from_cache(file_name):
     current_dir = os.path.dirname(os.path.realpath(__file__))
-    cache_path = current_dir + '/../cache/'
+    cache_path = current_dir + '/../../cache/'
 
     if os.path.exists(cache_path + file_name + '.pkl'):
         print("- loading from file")
@@ -31,9 +31,10 @@ def try_reading_from_cache(file_name):
         return None
 
 
-def save_to_cache(file_name, data):
-    current_dir = os.path.dirname(os.path.realpath(__file__))
-    cache_path = current_dir + '/../cache/'
+def save_to_cache(file_name, data, cache_path=None):
+    if cache_path is None:
+        current_dir = os.path.dirname(os.path.realpath(__file__))
+        cache_path = current_dir + '/../../cache/'
     fp = open(cache_path + file_name + '.pkl', 'wb')
     pkl.dump(data, fp)
     fp.close()
