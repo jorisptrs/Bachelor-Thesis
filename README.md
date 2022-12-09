@@ -4,11 +4,11 @@
 
 To get the code to run, make sure to:
 1. Download the TIMIT dataset (e.g., from https://catalog.ldc.upenn.edu/LDC93S1, or Kaggle) and place it into the
-root directory. The data folder should be named TIMIT.
+root directory. The data folder should be named TIMIT. This may be ignored when relying on the cahced files in 'code/cache'
 2. Install python 3.10 or higher
 3. Install Anaconda
 4. Run `conda env create -f environment.yml` from the root directory to load the dependencies into a new environment
-5. Now you should be able to use the jupyter notebooks
+Now, you should be able to use the jupyter notebooks.
 
 ### Abstract
 

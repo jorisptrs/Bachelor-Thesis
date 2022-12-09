@@ -1,3 +1,8 @@
+# Only a condensed version of the classification.ipynb used for faster
+# execution for hyperpamarameter optimization.
+
+# ---------------------------------------------------------------------
+
 import numpy as np
 import random
 import os, sys
