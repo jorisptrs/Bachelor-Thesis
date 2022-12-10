@@ -2,7 +2,7 @@ TIMIT
 *.ipynb_checkpoints/
 __pycache__/
 *.pyc
-#code/cache/
+code/cache/
 .idea
 *.iml
 .DS_Store
