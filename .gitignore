@@ -1,6 +1,6 @@
 TIMIT
 *.ipynb_checkpoints/
-__pycache__/
+*.__pycache__/
 *.pyc
 code/cache/
 .idea
