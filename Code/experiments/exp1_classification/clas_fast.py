@@ -63,7 +63,8 @@ clas = Classifier(
 clas.fit(features_train, labels_train, **{
     "n_mels":n_mels,
     "XorZ":'X',
-    "N": 100
+    "N": 100,
+    "cache": False
 })
 
 # Method "Z

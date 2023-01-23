@@ -30,6 +30,7 @@ class Classifier(BaseEstimator, ClassifierMixin):
         self.n_mels = params["n_mels"]
         self.XorZ = params["XorZ"]
         self.N = params["N"]
+        self.cache = params["cache"]
 
         # Group data by class
         group = group_by_labels(X, y)
@@ -49,7 +50,7 @@ class Classifier(BaseEstimator, ClassifierMixin):
             "weights": self.weights
         }
         self.esn = ESN(esn_params)
-        self.Cs_clas, self.Ns_clas = compute_Cs_and_Ns(group=group, esn=self.esn, aperture="auto", normalize=True, XorZ=self.XorZ, cache=False)
+        self.Cs_clas, self.Ns_clas = compute_Cs_and_Ns(group=group, esn=self.esn, aperture="auto", normalize=True, XorZ=self.XorZ, cache=self.cache)
 
         # Return the classifier
         return self
