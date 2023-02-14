@@ -212,7 +212,7 @@ class DataLoader():
         return feature_vectors, labels, sr
 
     def getFeatureAndLabelInSegments(self, audio_path=None, phon_path=None, n_mels=15, delta=True,
-                                     delta_delta=True, long_version=False, subsamples=10):
+                                     delta_delta=False, long_version=False, subsamples=10):
         """
         Returns
         - labels: a list of phonemes
