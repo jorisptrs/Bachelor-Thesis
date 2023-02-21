@@ -49,7 +49,7 @@ def remove_instance(C, x, lb, aperture):
 ######################################################################################################################
 # Logics
 
-def NOT_C(X, aperture):
+def NOT(X, aperture):
     R = corr(X)
     return inv(R) @ inv(inv(R) + 1 / np.square(aperture) * np.eye(X.shape[0]))
 
