@@ -106,8 +106,7 @@ def Ns_from_Cs(Cs):
 # Aperture adaption
 
 def sum_of_singular_vals(C):
-    _, s, _ = np.linalg.svd(C, hermitian=True)
-    return np.sum(s)
+    return np.trace(C)
 
 
 def adapt_singular_vals(C, target_sum, epsilon, debug=False):
@@ -177,19 +176,30 @@ def phi_squared(gamma, C):
     return linalg.norm(phi(C, R=None, gamma=gamma), 'fro') ** 2
 
 
-def best_gamma(C, start=0.5, end=1000, n=200):
+# def best_gamma(C, start=0.5, end=1000, n=200):
+#     ds = []
+#     exponents = np.linspace(np.log2(start), np.log2(end), n)
+#     gammas = [2 ** exponent for exponent in exponents]
+#     # epsilon = 1e-5
+#     # gammas = np.linspace(start, end, n)
+#
+#     for i in range(len(gammas) - 1):
+#         dgamma = gammas[i + 1] - gammas[i]
+#         df = phi_squared(gamma=gammas[i + 1], C=C) - phi_squared(gamma=gammas[i], C=C)
+#         ds.append(gammas[i] * df / dgamma)
+#     return gammas[np.argmax(ds)]
+
+def best_gamma(C, start=0.001, end=1000, n=200):
     ds = []
     exponents = np.linspace(np.log2(start), np.log2(end), n)
     gammas = [2 ** exponent for exponent in exponents]
-    # epsilon = 1e-5
-    # gammas = np.linspace(start, end, n)
+    epsilon = 1e-4
 
     for i in range(len(gammas) - 1):
-        dgamma = gammas[i + 1] - gammas[i]
-        df = phi_squared(gamma=gammas[i + 1], C=C) - phi_squared(gamma=gammas[i], C=C)
-        ds.append(gammas[i] * df / dgamma)
+        dgamma = np.log(gammas[i] + epsilon) - np.log(gammas[i])
+        df = phi_squared(gamma=gammas[i] + epsilon, C=C) - phi_squared(gamma=gammas[i], C=C)
+        ds.append(df / dgamma)
     return gammas[np.argmax(ds)]
-
 
 ######################################################################################################################
 # Clustering

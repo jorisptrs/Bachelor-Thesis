@@ -28,30 +28,29 @@ class KMeans:
     def k_means(self, nb_clusters=4, max_epochs=15, init_clusters="random", save=False, debug=False):
         if debug:
             print(f"Running KMeans: '{init_clusters}' initialization | {self.method} method | {nb_clusters} clusters.")
+        ds_hist = []
+        cluster_hist = []
+
 
         if init_clusters == "smart":
-            new_clusters = self.assign_to_clusters_smart(nb_clusters, debug)
+            self.init_smart(nb_clusters, debug)
         elif init_clusters == "random":
-            new_clusters = self.assign_to_clusters(nb_clusters)
+            self.init_random(nb_clusters)
         else:
             # if some initial assignments were passed, e.g., for prior clusters
-            new_clusters = init_clusters
-
-        ds_hist = [self.mean_intra_cluster_distance(new_clusters)]
-        cluster_hist = [new_clusters]
+            self.compute_centroids(init_clusters)
 
         for epoch in range(max_epochs):
-
-            self.compute_centroids(new_clusters)
             if debug:
                 print("Epoch", epoch, "# centroids:", len(self.centroids))
 
-            old_clusters = new_clusters.copy()
+            if epoch:
+                old_clusters = new_clusters.copy()
             new_clusters = [[] for _ in self.centroids]
-
             distances = []
+
+            # Assignment step
             for point in self.points:
-                # Find closest centroid
                 ds = self.distances_to_centroids(point, normalize=False)
                 centroid_index = np.argmin(ds)
                 new_clusters[centroid_index].append(point)
@@ -59,7 +58,11 @@ class KMeans:
             ds_hist.append(np.mean(distances))
             cluster_hist.append(new_clusters)
 
-            if Point.equal_cluster_groups(new_clusters, old_clusters):
+            # Centroid update step
+            self.compute_centroids(new_clusters)
+
+            # Convergence check
+            if epoch and Point.equal_cluster_groups(new_clusters, old_clusters):
                 if debug:
                     print("Converged")
                 break
@@ -77,7 +80,7 @@ class KMeans:
     # ---------------------------------------------------------------------------------------- #
     # Kmeans helpers
 
-    def assign_to_clusters(self, nb_clusters):
+    def init_random(self, nb_clusters):
         """
         Assigns points to conceptors according to one of several assignment methods
         Returns [[points in cluster 1], [points in cluster 2], ...]
@@ -87,11 +90,12 @@ class KMeans:
         np.random.shuffle(points)
         for i in range(nb_clusters):
             clusters[i] = points[i * int(self.nb_points / nb_clusters): (i + 1) * int(self.nb_points / nb_clusters)]
+
+        self.compute_centroids(clusters)
         return clusters
 
-    def assign_to_clusters_smart(self, nb_clusters, debug=False):
+    def init_smart(self, nb_clusters, debug=False):
         # 1. Find centroids. Adaptation from paper
-        clusters = [[] for _ in range(nb_clusters)]
         points = self.points.copy()
         initial_p = random.choice(points)
         points.remove(initial_p)
@@ -106,7 +110,7 @@ class KMeans:
 
             for point in points:
                 ds = self.distances_to_centroids(point)
-                distances.append(np.min(ds))
+                distances.append(np.min(ds) ** 2)
 
             probabilities = distances / np.sum(distances)
             next_p = np.random.choice(points, p=probabilities)
@@ -114,14 +118,6 @@ class KMeans:
 
             self.centroids.append(next_p)
             self.compute_centroids_Ns()
-
-        # 2. Perform assignments
-        for point in self.points:
-            ds = self.distances_to_centroids(point)
-            centroid_index = np.argmin(ds)
-            clusters[centroid_index].append(point)
-
-        return clusters
 
     def compute_centroids_Ns(self):
         if not self.method.uses_neg_conceptors():
@@ -151,8 +147,8 @@ class KMeans:
                 self.centroids.append(Point(signal=mean_signal, C=conceptor, esn_state=mean_esn_state))
 
         if method.is_in_conceptor_space():
-            rescaled_Cs = adapt_singular_vals_of_Cs(Point.get_Cs(self.centroids), target_sum=self.target_sum)
-            self.centroids = Point.update_points(self.centroids, Cs=rescaled_Cs)
+           rescaled_Cs = adapt_singular_vals_of_Cs(Point.get_Cs(self.centroids), target_sum=self.target_sum)
+           self.centroids = Point.update_points(self.centroids, Cs=rescaled_Cs)
         # for C_kmeans, C_kmeans_recomputed in zip(Cs_kmeans, Cs_kmeans_recomputed):
         # print("Mean divergence: ", d(C_kmeans, C_kmeans_recomputed)/np.linalg.norm(C_kmeans))
         self.compute_centroids_Ns()

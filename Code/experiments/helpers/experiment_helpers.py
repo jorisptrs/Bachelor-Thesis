@@ -52,7 +52,7 @@ def compute_Cs(group=None, signals=None, esn=None, aperture="auto", normalize=Tr
         Cs = try_reading_from_cache(file_name)
 
     if not Cs:
-        print("- computing conceptors")
+        print("Computing conceptors...")
         Cs = []
         if group is None:
             for signal in signals:
