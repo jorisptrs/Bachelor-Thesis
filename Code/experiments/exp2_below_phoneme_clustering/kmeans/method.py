@@ -6,20 +6,22 @@ class Method(Enum):
     The possible methods for clustering. They affect the centroid computation and the cluster assignment steps.
     """
 
-    OG_SIGNALS = 1 # Mean signals centroids & euclidian distance function (applied pairwise to corresponding timesteps)
-    CENTROIDS = 2 # Mean reservoir state centroids & euclidian distance function (applied pairwise to corresponding timesteps) (TODO: give a more intuitive name)
-    SIMS = 3 # Conceptor centroids & conceptor similarity-based distance function
-    PRED = 4 # Conceptor centroids & evidence distance function
+    SIGNALS_EUCLIDIAN = 1 # Mean signals centroids & euclidian distance function (applied pairwise to corresponding timesteps)
+    STATE_EUCLIDIAN = 2 # Mean reservoir state centroids & euclidian distance function (applied pairwise to corresponding timesteps)
+    CONCEPTOR_SIM = 3 # Conceptor centroids & conceptor similarity-based distance function
+    CONCEPTOR_PRED = 4 # Conceptor centroids & evidence distance function
     PRED_CENTROIDS = 5
+    CONCEPTOR_FROB = 6
+    CONCEPTOR_SPECTRAL = 7
 
     def is_in_conceptor_space(self):
-        return self in [Method.PRED, Method.SIMS, Method.PRED_CENTROIDS]
+        return self in [Method.CONCEPTOR_PRED, Method.CONCEPTOR_SIM, Method.PRED_CENTROIDS, Method.CONCEPTOR_FROB, Method.CONCEPTOR_SPECTRAL]
 
     def is_in_eucl_space(self):
-        return self in [Method.OG_SIGNALS, Method.CENTROIDS]
+        return self in [Method.SIGNALS_EUCLIDIAN, Method.STATE_EUCLIDIAN]
 
     def uses_neg_conceptors(self):
-        return self in [Method.PRED, Method.PRED_CENTROIDS]
+        return self in [Method.CONCEPTOR_PRED, Method.PRED_CENTROIDS]
 
     @staticmethod
     def get_all():

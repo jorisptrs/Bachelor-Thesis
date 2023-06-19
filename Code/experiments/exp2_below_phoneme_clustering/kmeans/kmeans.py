@@ -29,8 +29,8 @@ class KMeans:
         if debug:
             print(f"Running KMeans: '{init_clusters}' initialization | {self.method} method | {nb_clusters} clusters.")
         ds_hist = []
+        centroid_hist = []
         cluster_hist = []
-
 
         if init_clusters == "smart":
             self.init_smart(nb_clusters, debug)
@@ -55,11 +55,13 @@ class KMeans:
                 centroid_index = np.argmin(ds)
                 new_clusters[centroid_index].append(point)
                 distances.append(np.min(ds))
-            ds_hist.append(np.mean(distances))
-            cluster_hist.append(new_clusters)
 
             # Centroid update step
-            self.compute_centroids(new_clusters)
+            self.compute_centroids(new_clusters, rescale=True)
+
+            ds_hist.append(np.mean(distances))
+            cluster_hist.append(new_clusters)
+            centroid_hist.append(self.centroids)
 
             # Convergence check
             if epoch and Point.equal_cluster_groups(new_clusters, old_clusters):
@@ -67,7 +69,7 @@ class KMeans:
                     print("Converged")
                 break
 
-        return self.centroids, new_clusters, ds_hist, cluster_hist
+        return self.centroids, new_clusters, ds_hist, cluster_hist, centroid_hist
 
     def mean_intra_cluster_distance(self, clusters):
         ds = []
@@ -126,7 +128,7 @@ class KMeans:
         Ns = Ns_from_Cs(Cs)
         self.centroids = Point.update_points(self.centroids, Ns=Ns)
 
-    def compute_centroids(self, clusters, method=None):
+    def compute_centroids(self, clusters, method=None, rescale = True):
         if method is None:
             method = self.method
 
@@ -135,10 +137,10 @@ class KMeans:
             if not cluster:
                 print("GAVE UP A CLUSTER, SINCE IT HAD NO MEMBERS")
             else:
-                mean_signal = np.mean(Point.get_signals(cluster), axis=0) # For Method.OG_SIGNALS
+                mean_signal = np.mean(Point.get_signals(cluster), axis=0) # For Method.SIGNALS_EUCLIDIAN
                 mean_esn_state = np.mean(Point.get_esn_states(cluster), axis=0)  # For Method.PRED_CENTROID
                 conceptor = None
-                if method.is_in_conceptor_space() or method is Method.CENTROIDS:
+                if method.is_in_conceptor_space() or method is Method.STATE_EUCLIDIAN:
                     X = np.array([])
                     for point in cluster:
                         X = np.hstack((X, point.esn_state)) if X.size else point.esn_state
@@ -146,7 +148,7 @@ class KMeans:
                         conceptor = compute_c(X, 1)
                 self.centroids.append(Point(signal=mean_signal, C=conceptor, esn_state=mean_esn_state))
 
-        if method.is_in_conceptor_space():
+        if method.is_in_conceptor_space() and rescale:
            rescaled_Cs = adapt_singular_vals_of_Cs(Point.get_Cs(self.centroids), target_sum=self.target_sum)
            self.centroids = Point.update_points(self.centroids, Cs=rescaled_Cs)
         # for C_kmeans, C_kmeans_recomputed in zip(Cs_kmeans, Cs_kmeans_recomputed):
@@ -162,20 +164,24 @@ class KMeans:
             method = self.method
         dist = None
 
-        if method is Method.SIMS:
+        if method is Method.CONCEPTOR_SIM:
             dist = 1 - similarity_c(point.C, centroid.C)
-        elif method is Method.PRED:
+        elif method is Method.CONCEPTOR_PRED:
             if centroid.N is None:
                 self.compute_centroids_Ns()
             dist = combined_evidence_vec(point.esn_state, Cs=[centroid.C], idx=0, Ns=[centroid.N])
-        elif method is Method.OG_SIGNALS:
+        elif method is Method.SIGNALS_EUCLIDIAN:
             dist = Point.d(point.signal, centroid.signal)
-        elif method is Method.CENTROIDS:
+        elif method is Method.STATE_EUCLIDIAN:
             dist = Point.d(point.esn_state, centroid.esn_state)
+        elif method is Method.CONCEPTOR_FROB:
+            dist = Point.d(point.C, centroid.C)
+        elif method is Method.CONCEPTOR_SPECTRAL:
+            dist = spectral_d(point.C, centroid.C)
         elif method is Method.PRED_CENTROIDS:
             dist = (
-                self.distance_to_centroid(point, centroid, Method.PRED) +
-                self.distance_to_centroid(point, centroid, Method.CENTROIDS)
+                self.distance_to_centroid(point, centroid, Method.CONCEPTOR_PRED) +
+                self.distance_to_centroid(point, centroid, Method.STATE_EUCLIDIAN)
             )/2
 
         return dist
@@ -186,18 +192,18 @@ class KMeans:
         if method is None:
             method = self.method
 
-        if method is Method.PRED:
+        if method is Method.CONCEPTOR_PRED:
             es = evidences_for_Cs(point.esn_state, Point.get_Cs(self.centroids),
                                   Point.get_Ns(self.centroids), two_d=self.XorZ == "X")
             ds = [1/e for e in es]
 
-        elif method.is_in_eucl_space() or method is Method.SIMS:
-            ds = [self.distance_to_centroid(point, centroid) for centroid in self.centroids]
-
         elif method is Method.PRED_CENTROIDS:
-            ds_pred = self.distances_to_centroids(point, normalize=True, method=Method.PRED)
-            ds_centroid = self.distances_to_centroids(point, normalize=True, method=Method.CENTROIDS)
+            ds_pred = self.distances_to_centroids(point, normalize=True, method=Method.CONCEPTOR_PRED)
+            ds_centroid = self.distances_to_centroids(point, normalize=True, method=Method.STATE_EUCLIDIAN)
             ds = np.add(ds_pred, ds_centroid) / 2
+
+        else:
+            ds = [self.distance_to_centroid(point, centroid) for centroid in self.centroids]
 
         return [d / sum(ds) for d in ds] if normalize else ds
 

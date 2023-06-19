@@ -259,6 +259,24 @@ def walking_NRMSE(signal, signal_truth, window, max_shift):
 
 
 # conceptors
+def spectral_d(C1, C2):
+    c_dif1 = C1-C2
+    _, s1, _ = np.linalg.svd(c_dif1, hermitian=True, full_matrices=False)
+    c_dif2 = C2-C1
+    _, s2, _ = np.linalg.svd(c_dif2, hermitian=True, full_matrices=False)
+    return np.max([np.mean(s1), np.mean(s2)])
+
+def spectral_d2(C1, C2):
+    c_dif1 = C1-C2
+    _, s1, _ = np.linalg.svd(c_dif1, hermitian=True, full_matrices=False)
+    n1 = np.sum(s1[s1<=0])/s1.size
+
+    c_dif2 = C2-C1
+    _, s2, _ = np.linalg.svd(c_dif2, hermitian=True, full_matrices=False)
+    n2 = np.sum(s2[s2<=0])/s2.size
+
+    return 1+np.max([n1,n2])
+
 def similarity_c(C1, C2):
     U1, s1, _ = np.linalg.svd(C1, hermitian=True, full_matrices=False)
     U2, s2, _ = np.linalg.svd(C2, hermitian=True, full_matrices=False)
@@ -286,6 +304,7 @@ def combined_evidence_vec(X, Cs, idx, Ns=None):
     else:
         e_neg = np.sum(X * (negative_c(Cs, idx) @ X))
     return (e_pos + e_neg) / 2
+
 
 
 def evidences_for_Cs(X, Cs, Ns, two_d=True):

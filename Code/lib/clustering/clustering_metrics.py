@@ -1,7 +1,8 @@
 import math
 
 import numpy as np
-
+from matplotlib import pyplot as plt
+import matplotlib.cm as cm
 from experiments.exp2_below_phoneme_clustering.kmeans.kmeans import KMeans
 
 
@@ -107,11 +108,15 @@ class Silhouette:
     def __init__(self, km):
         self.km = km
 
-    def silh_aux(self, point, clusters):
+    def silh_aux(self, point, clusters, centroids=None):
         a = 0
         b = 0
+        clusters = self.km.remove_empty_clusters(clusters)
         for i, cluster in enumerate(clusters):
-            dist = self.km.distance_to_centroid(point, centroid=self.km.centroids[i])
+            if centroids is None:
+                self.km.compute_centroids(clusters)
+                centroids = self.km.centroids
+            dist = self.km.distance_to_centroid(point, centroid=centroids[i])
             if point in cluster:
                 if len(cluster) == 1:
                     return 0
@@ -120,13 +125,68 @@ class Silhouette:
                 b = dist if not b else min(b, dist)
         return (b - a) / max(a, b)
 
-    def simpl_silh(self, clusters):
+    def simpl_silh(self, clusters, centroids=None):
         clusters = self.km.remove_empty_clusters(clusters)
-        self.km.compute_centroids(clusters)
-        return np.mean([self.silh_aux(point, clusters=clusters) for point in self.km.points])
+        if centroids is None:
+            self.km.compute_centroids(clusters)
+            centroids = self.km.centroids
+        return np.mean([self.silh_aux(point, clusters=clusters, centroids=centroids) for point in self.km.points])
 
     def simpl_silh_from_list(self, cluster_hist):
         return [ self.simpl_silh(cluster) for cluster in cluster_hist ]
+
+    def sil_plot(self, clusters, centroids=None, ax1=None):
+        n_clusters = len(clusters)
+        n_points = self.km.nb_points
+        if ax1 is None:
+            fig, ax1 = plt.subplots(1)
+            fig.set_size_inches(7, 7)
+
+        ax1.set_xlim([-1, 1])
+        ax1.set_ylim([0, n_points + (n_clusters + 1) * 10])
+
+        silhouette_avg = self.simpl_silh(clusters)
+
+        y_lower = 10
+        for i, cluster in enumerate(clusters):
+            silhouette_values = [ self.silh_aux(p, clusters, centroids) for p in cluster ]
+            silhouette_values.sort()
+            size = len(silhouette_values)
+            y_upper = y_lower + size
+
+            color = cm.nipy_spectral(float(i) / n_clusters)
+            ax1.fill_betweenx(
+                np.arange(y_lower, y_upper),
+                0,
+                silhouette_values,
+                facecolor=color,
+                edgecolor=color,
+                alpha=0.7
+            )
+
+            ax1.text(-0.05, y_lower + 0.5 * size, str(i))
+            y_lower = y_upper + 10
+
+        ax1.set_xlabel("Silhouette coefficient values")
+        ax1.set_ylabel("Cluster label")
+
+        # The vertical line for average silhouette score of all the values
+        ax1.axvline(x=silhouette_avg, color="red", linestyle="--")
+
+        ax1.set_yticks([])  # Clear the yaxis labels / ticks
+        ax1.set_xticks(list(np.arange(-1, 1.1, .2)))
+
+    def sil_plot_from_list(self, cluster_hist, centroid_hist):
+        num_plots = len(cluster_hist)
+
+        fig, axs = plt.subplots(num_plots, 1)  # Creates a figure and a 1D array of axes
+        fig.set_size_inches(7, 7 * num_plots)
+
+        for clusters, centroids, ax in zip(cluster_hist, centroid_hist, axs):
+            self.sil_plot(clusters, centroids, ax)
+
+        plt.tight_layout()  # Adjusts subplot params so that subplots fit into the figure area
+        plt.show()
 
 def get_heat_map(ps, sim_func, zero_diag=True):
     heat_map = np.zeros((len(ps), len(ps)))
