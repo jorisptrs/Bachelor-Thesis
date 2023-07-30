@@ -1,4 +1,5 @@
 from dataset.data_processing import group_by_labels
+from debug import debug_print
 from experiments.helpers.experiment_helpers import *
 from sklearn.base import BaseEstimator, ClassifierMixin
 
@@ -38,7 +39,7 @@ class Classifier(BaseEstimator, ClassifierMixin):
         self.classes = list(group.keys())
         self.n_samples = sum([len(x) for x in list(group.values())])
 
-        print(f"Number of samples: {self.n_samples}")
+        debug_print(f"Number of samples: {self.n_samples}")
         # Init Reservoir
         esn_params = {
             "in_dim": self.n_mels,

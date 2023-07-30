@@ -10,12 +10,14 @@ class Method(Enum):
     STATE_EUCLIDIAN = 2 # Mean reservoir state centroids & euclidian distance function (applied pairwise to corresponding timesteps)
     CONCEPTOR_SIM = 3 # Conceptor centroids & conceptor similarity-based distance function
     CONCEPTOR_PRED = 4 # Conceptor centroids & evidence distance function
-    PRED_CENTROIDS = 5
-    CONCEPTOR_FROB = 6
-    CONCEPTOR_SPECTRAL = 7
+    CONCEPTOR_PRED_CS_ONLY = 5
+    PRED_CENTROIDS = 6
+    CONCEPTOR_FROB = 7
+    CONCEPTOR_SPECTRAL = 8
 
     def is_in_conceptor_space(self):
-        return self in [Method.CONCEPTOR_PRED, Method.CONCEPTOR_SIM, Method.PRED_CENTROIDS, Method.CONCEPTOR_FROB, Method.CONCEPTOR_SPECTRAL]
+        return self in [Method.CONCEPTOR_PRED, Method.CONCEPTOR_SIM, Method.PRED_CENTROIDS,
+                        Method.CONCEPTOR_FROB, Method.CONCEPTOR_SPECTRAL, Method.CONCEPTOR_PRED_CS_ONLY]
 
     def is_in_eucl_space(self):
         return self in [Method.SIGNALS_EUCLIDIAN, Method.STATE_EUCLIDIAN]

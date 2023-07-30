@@ -2,6 +2,7 @@ import gc
 import os
 import pickle as pkl
 
+from debug import debug_print
 from lib.conceptors import *
 
 """
@@ -10,7 +11,7 @@ Facade to simplify experiment code, e.g., when computing certain values or cachi
 
 def compute_Cs_and_Ns(group, esn, aperture="auto", normalize=True, XorZ="X", cache=True):
     Cs = compute_Cs(group=group, esn=esn, aperture=aperture, normalize=normalize, XorZ=XorZ, cache=cache)
-    print("- computing negative conceptors")
+    debug_print("- computing negative conceptors")
     Ns = Ns_from_Cs(Cs)
     return Cs, Ns
 
@@ -20,11 +21,11 @@ def try_reading_from_cache(file_name):
     cache_path = current_dir + '/../../cache/'
 
     if os.path.exists(cache_path + file_name + '.pkl'):
-        print("- loading from file")
+        debug_print("- loading from file")
         fp = open(cache_path + file_name + '.pkl', 'rb')
         data = pkl.load(fp)
         fp.close()
-        print("--- Done")
+        debug_print("--- Done")
         gc.collect()
         return data
     else:
@@ -52,7 +53,7 @@ def compute_Cs(group=None, signals=None, esn=None, aperture="auto", normalize=Tr
         Cs = try_reading_from_cache(file_name)
 
     if not Cs:
-        print("Computing conceptors...")
+        debug_print("Computing conceptors...")
         Cs = []
         if group is None:
             for signal in signals:
@@ -69,10 +70,10 @@ def compute_Cs(group=None, signals=None, esn=None, aperture="auto", normalize=Tr
                 else:
                     Cs.append(compute_c(X, aperture))
         if aperture == "auto":
-            print("optimizing")
-            Cs = optimize_apertures(Cs, start=0.5, end=500, n=150)
+            debug_print("optimizing")
+            Cs = optimize_apertures(Cs, start=0.001, end=500, n=150)
         if normalize:
-            print("normalizing")
+            debug_print("normalizing")
             Cs = normalize_apertures(Cs)
 
         if cache:

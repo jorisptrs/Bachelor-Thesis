@@ -3,9 +3,9 @@ import random
 random.seed(0)
 
 
-def filter_data(unfiltered_features, unfiltered_labels, limit=None, selected_labels=None):
+def filter_data(unfiltered_features, unfiltered_labels, limit=None, selected_labels=None, test=False):
     group = group_by_labels(unfiltered_features, unfiltered_labels, selected_labels)
-    group = downsample(group, limit)
+    group, remaining_features, remaining_labels = downsample_2(group, limit)
 
     classes = list(group.keys())
     filtered_features = []
@@ -16,7 +16,10 @@ def filter_data(unfiltered_features, unfiltered_labels, limit=None, selected_lab
             filtered_labels.append(label)
 
     print(f"Filtered to {len(filtered_features)} samples of shape {filtered_features[0].shape}")
-    return classes, filtered_features, filtered_labels
+    if test:
+        return classes, filtered_features, filtered_labels, remaining_features, remaining_labels
+    else:
+        return classes, filtered_features, filtered_labels
 
 
 def group_by_labels(X, y, selected_labels=None):
@@ -39,4 +42,18 @@ def downsample(group, limit):
     for key in group.keys():
         if limit is not None and len(group[key]) > limit:
             group[key] = random.sample(group[key], limit)
+
     return group
+
+def downsample_2(group, limit):
+    remaining_features = []
+    remaining_labels = []
+    if limit == "trunkate":
+        limit = min([len(value) for value in group.values()])
+    for key in group.keys():
+        if limit is not None and len(group[key]) > limit:
+            random.shuffle(group[key])
+            remaining_features += group[key][limit:]
+            remaining_labels += [key] * (len(group[key]) - limit)
+            group[key] = group[key][:limit]
+    return group, remaining_features, remaining_labels

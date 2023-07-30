@@ -1,6 +1,8 @@
 import numpy as np
 from scipy import linalg
 
+from debug import debug_print
+
 inv = linalg.inv
 pinv = linalg.pinv
 
@@ -28,7 +30,7 @@ def compute_c(X, aperture, weights=None):
     # Sigma = np.diag(Eig_vals)
     # for elem in Eig_vals:
     #     if abs(elem) < 1e-100:
-    #         print("!!! Zero singular value(s) !!!")
+    #         debug_print("!!! Zero singular value(s) !!!")
     return R @ inv(R + aperture ** (-2) * np.eye(R.shape[0]))
 
 
@@ -141,8 +143,8 @@ def normalize_apertures(Cs, target_sum=None, debug=False):
     if target_sum is None:
         target_sum = np.mean([sum_of_singular_vals(C) for C in Cs])
     st = np.std([sum_of_singular_vals(C) for C in Cs])
-    print("Target: ", target_sum)
-    print("std", st)
+    debug_print("Target: ", target_sum)
+    debug_print("std", st)
     Cs = adapt_singular_vals_of_Cs(Cs, target_sum)
     return (Cs, target_sum) if debug else Cs
 
@@ -150,12 +152,12 @@ def normalize_apertures(Cs, target_sum=None, debug=False):
 def optimize_apertures(Cs, start=0.5, end=1000, n=150, debug=False):
     gammas = []
     normalized_Cs = []
-    print("Computing gammas...")
+    debug_print("Computing gammas...")
     for i, C in enumerate(Cs):
-        # print(i + 1, " of ", len(ps))
+        # debug_print(i + 1, " of ", len(ps))
         gammas.append(best_gamma(C, start, end, n))
     optimal_gamma = np.mean(gammas)
-    print("Optimal gamma: ", optimal_gamma)
+    debug_print("Optimal gamma: ", optimal_gamma)
     for i, C in enumerate(Cs):
         normalized_Cs.append(phi(C, gamma=optimal_gamma, R=None))
     return (normalized_Cs, optimal_gamma) if debug else normalized_Cs
@@ -306,9 +308,17 @@ def combined_evidence_vec(X, Cs, idx, Ns=None):
     return (e_pos + e_neg) / 2
 
 
+def pos_evidence_vec(X, Cs, idx):
+    return np.sum(X * (Cs[idx] @ X))
 
 def evidences_for_Cs(X, Cs, Ns, two_d=True):
     es = [combined_evidence_vec(X, Cs, idx, Ns) for idx in range(len(Cs))]
+    if two_d:
+        es = [np.sum(e) for e in es]
+    return es
+
+def pos_evidences_for_Cs(X, Cs, two_d=True):
+    es = [pos_evidence_vec(X, Cs, idx) for idx in range(len(Cs))]
     if two_d:
         es = [np.sum(e) for e in es]
     return es
