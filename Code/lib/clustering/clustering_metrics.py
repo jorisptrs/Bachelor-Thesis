@@ -4,6 +4,10 @@ import numpy as np
 from matplotlib import pyplot as plt
 import matplotlib.cm as cm
 
+from scipy.optimize import linear_sum_assignment
+
+
+
 from classifier import Classifier
 from debug import debug_print
 from experiments.exp2_below_phoneme_clustering.kmeans.kmeans import KMeans
@@ -52,6 +56,7 @@ def get_overlaps(assignments, correct_assignments):
                 overlaps[j] += p in correct_assignment
     return overlaps
 
+
 def get_heat_map(ps, sim_func, zero_diag=True):
     heat_map = np.zeros((len(ps), len(ps)))
 
@@ -64,27 +69,31 @@ def get_heat_map(ps, sim_func, zero_diag=True):
     return heat_map
 
 def match_clusters_to_classes(clusters, ground_truth, phonemes):
-    scores = []
-    for i, cluster in enumerate(clusters):
-        for j, true_class in enumerate(ground_truth):
-            match_score = len([p for p in cluster if p in true_class])
-            scores.append((match_score, i, j))
-    scores.sort(reverse=True)
+    """
+    :param clusters: [[<points of cluster 0>, [<points of cluster 1>, ...]
+    :param ground_truth: [[<points of class 0>, [<points of class 1>, ...]
+    :param phonemes: the set of labels of the classes, respective of their order in the outer list
+    """
+    num_clusters = len(clusters)
 
-    # Keep track of assignments
-    cluster_labels = [None] * len(clusters)
-    class_assigned = [False] * len(ground_truth)
+    # Compute weights
+    match_scores = [[len([p for p in cluster if p in true_class]) for true_class in ground_truth] for cluster in clusters]
+    max_match = max(map(max, match_scores))
+    cost_matrix = [[max_match - score for score in row] for row in match_scores]
 
-    for score, i, j in scores:
-        if cluster_labels[i] is not None or class_assigned[j]:
-            continue
+    # Get optimal assignment via Kuhn-Munkres algorithm
+    cluster_indices, class_indices = linear_sum_assignment(cost_matrix)
+
+    # Assigning labels
+    cluster_labels = [None] * num_clusters
+    for i, j in zip(cluster_indices, class_indices):
         cluster_labels[i] = phonemes[j]
-        class_assigned[j] = True
 
     if None in cluster_labels:
         debug_print("Not all clusters could be assigned to a class")
 
     return cluster_labels
+
 
 def helper(clusters, labels):
     features_train, labels_train = [], []
@@ -93,8 +102,9 @@ def helper(clusters, labels):
         labels_train += [labels[i]] * len(cluster)
     return features_train, labels_train
 
+
 def train_and_test_clas(features_train, labels_train, features_test, labels_test):
-    n_mels = 14
+    n_mels = 13
     clas = Classifier(W_in_scale=1.1,
                       b_scale=.6,
                       spectral_radius=2.57,
@@ -108,10 +118,15 @@ def train_and_test_clas(features_train, labels_train, features_test, labels_test
     })
     return clas.score(features_test, labels_test)
 
+
 def clas_acc(clusters, correct_clusters, phonemes, features_test, labels_test):
+    """
+    :param phonemes: the list of phonemes in the order of correct_clusters
+    """
     matched_labels = match_clusters_to_classes(clusters, correct_clusters, phonemes)
     features_train, labels_train = helper(clusters, matched_labels)
     return train_and_test_clas(features_train, labels_train, features_test, labels_test)
+
 
 def clas_acc_from_list(cluster_hist, correct_clusters, phonemes, features_test, labels_test):
     return [clas_acc(clusters, correct_clusters, phonemes, features_test, labels_test) for clusters in cluster_hist]

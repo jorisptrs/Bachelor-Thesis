@@ -123,9 +123,11 @@ def adapt_singular_vals(C, target_sum, epsilon, debug=False):
     return (C, sss) if debug else C
 
 
-def adapt_singular_vals_of_Cs(Cs, target_sum, epsilon=0.01, debug=False):
+def adapt_singular_vals_of_Cs(Cs, target_sum=None, epsilon=0.01, debug=False):
     normalized_Cs = []
     ss_list = []
+    if target_sum is None:
+        target_sum = np.mean([sum_of_singular_vals(C) for C in Cs])
     for C in Cs:
         if debug:
             normalized_C, ss = adapt_singular_vals(C, target_sum, epsilon=epsilon, debug=debug)

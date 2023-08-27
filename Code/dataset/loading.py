@@ -331,13 +331,12 @@ class DataLoader():
 
     def collectFeaturesInSegments(self, ft='Train', n_mels=15, delta=False, delta_delta=False,
                                   normalize=True, long_version=False, speakers=[], dr=[], sentence="", subsamples=10,
-                                  path_option=""):
+                                  path_option="", include_speakers_and_regions=False):
         """
         Returns
         - labels: a list of phonemes
         - feature_vectors: all corresponding sections of the signal
         """
-
         if path_option != "" and os.path.exists(self.cache_path + path_option + '_features.pkl') and os.path.exists(
                 self.cache_path + path_option + '_labels.pkl'):
             print("-from output")
@@ -347,17 +346,30 @@ class DataLoader():
             labels = pkl.load(flp)
             ffp.close()
             flp.close()
-            print('---- success')
-            return features, labels, 0
-            # --------
+
+            if include_speakers_and_regions:
+                if os.path.exists(self.cache_path + path_option + '_speakers.pkl') and os.path.exists(
+                        self.cache_path + path_option + '_dr.pkl'):
+                    fsp = open(self.cache_path + path_option + '_speakers.pkl', 'rb')
+                    fdr = open(self.cache_path + path_option + '_dr.pkl', 'rb')
+                    speakers_list = pkl.load(fsp)
+                    dr_list = pkl.load(fdr)
+                    fsp.close()
+                    fdr.close()
+                    print('---- success')
+                    return features, labels, speakers_list, dr_list, 0
+            else:
+                print('---- success')
+                return features, labels, 0
         else:
             print('--- Failed')
             print('Collecting Features from Audio Files')
-            # -------------
             tddA = self.get_audio_file_names(ft, speakers, dr, sentence)
             tddA.index = range(tddA.shape[0])
             feature_vectors = []
             labels = []
+            speakers_list = []
+            dr_list = []
 
             print(tddA.shape[0])
             for i in range(tddA.shape[0]):
@@ -370,6 +382,8 @@ class DataLoader():
                                                                           subsamples=subsamples)
                 for feature in fv:
                     feature_vectors.append(np.asarray(np.array(feature, dtype=object)).astype(np.float32))
+                    speakers_list.append(tddA.loc[i]['speaker_id'])
+                    dr_list.append(tddA.loc[i]['dialect_region'])
                 labels += lv
 
             if normalize:
@@ -384,9 +398,20 @@ class DataLoader():
                 pkl.dump(labels, flp)
                 ffp.close()
                 flp.close()
+                if include_speakers_and_regions:
+                    fsp = open(self.cache_path + path_option + "_speakers.pkl", 'wb')
+                    fdr = open(self.cache_path + path_option + "_dr.pkl", 'wb')
+                    pkl.dump(speakers_list, fsp)
+                    pkl.dump(dr_list, fdr)
+                    fsp.close()
+                    fdr.close()
             print('--- Completed')
-            # -------
         gc.collect()
 
         print(f"Loaded to {len(feature_vectors)} samples of shape {feature_vectors[0].shape}")
-        return feature_vectors, labels, oversamplings
+        if include_speakers_and_regions:
+            return feature_vectors, labels, speakers_list, dr_list, oversamplings
+        else:
+            return feature_vectors, labels, oversamplings
+
+

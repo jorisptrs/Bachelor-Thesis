@@ -178,7 +178,8 @@ class KMeans:
                 self.centroids.append(Point(signal=mean_signal, C=conceptor, esn_state=mean_esn_state))
 
         if method.is_in_conceptor_space() and rescale:
-            rescaled_Cs = adapt_singular_vals_of_Cs(Point.get_Cs(self.centroids), target_sum=self.target_sum)
+            rescaled_Cs = optimize_apertures(Point.get_Cs(self.centroids))
+            rescaled_Cs = adapt_singular_vals_of_Cs(rescaled_Cs, target_sum=self.target_sum)
             self.centroids = Point.update_points(self.centroids, Cs=rescaled_Cs)
         # for C_kmeans, C_kmeans_recomputed in zip(Cs_kmeans, Cs_kmeans_recomputed):
         # print("Mean divergence: ", d(C_kmeans, C_kmeans_recomputed)/np.linalg.norm(C_kmeans))
@@ -285,8 +286,10 @@ class KMeans:
                 ds = self.distances_to_centroids(p)
                 print(np.argmin(ds))
 
-    def intra_dist_mean(self, clusters):
+    def intra_dist_mean(self, clusters, method=None):
         sum = 0
+        if not self.centroids and method is not None:
+            self.compute_centroids(clusters, method)
         for c, cluster in zip(self.centroids, clusters):
             for p in cluster:
                 sum += self.distance_to_centroid(p, c)
