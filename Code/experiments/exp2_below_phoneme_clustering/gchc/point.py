@@ -97,7 +97,7 @@ class Point:
                 updated.append(p)
         return updated
 
-    # Euclidian distance / Frobenius norm
+    # Euclidean distance / Frobenius norm
     @staticmethod
     def d(x, y):
         return np.linalg.norm(x - y)

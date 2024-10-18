@@ -13,6 +13,9 @@ def compute_Cs_and_Ns(group, esn, aperture="auto", normalize=True, XorZ="X", cac
     Cs = compute_Cs(group=group, esn=esn, aperture=aperture, normalize=normalize, XorZ=XorZ, cache=cache)
     debug_print("- computing negative conceptors")
     Ns = Ns_from_Cs(Cs)
+    print("std of Ns before normalization", np.std([sum_of_singular_vals(C) for C in Ns]))
+    Ns = normalize_apertures(Ns)
+    print("std of Ns after normalization", np.std([sum_of_singular_vals(C) for C in Ns]))
     return Cs, Ns
 
 
@@ -74,7 +77,9 @@ def compute_Cs(group=None, signals=None, esn=None, aperture="auto", normalize=Tr
             Cs = optimize_apertures(Cs, start=0.001, end=500, n=150)
         if normalize:
             debug_print("normalizing")
+            print("std of Cs before normalization", np.std([sum_of_singular_vals(C) for C in Cs]))
             Cs = normalize_apertures(Cs)
+            print("std of Cs after normalization", np.std([sum_of_singular_vals(C) for C in Cs]))
 
         if cache:
             save_to_cache(file_name, Cs)

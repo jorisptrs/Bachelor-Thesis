@@ -94,7 +94,7 @@ def get_assignments(cuts, c_map):
 
 
 #######################################
-# K-means
+# GCHC
 def cutting(X, nb_conceptors):
     nb_points = X.shape[1]
     cuts, c_map = cutt(nb_points, nb_conceptors)

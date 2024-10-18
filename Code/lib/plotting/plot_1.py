@@ -66,10 +66,10 @@ class Plot:
 
     def plot_progress(self, NMI_list, silh_list):
         plt.figure()
-        plt.plot(NMI_list, color="orange", label="Kmeans NMI")
+        plt.plot(NMI_list, color="orange", label="GCHC NMI")
         plt.axhline(y=nmi_baseline, color='orange', linestyle='dashdot', label="Baseline NMI")
         plt.axhline(y=nmi_truth, color='orange', linestyle='dashed', label="Dataset NMI")
-        plt.plot(silh_list, color="blue", label="Kmeans SC")
+        plt.plot(silh_list, color="blue", label="GCHC SC")
         plt.axhline(y=sil_baseline, color='blue', linestyle='dashdot', label="Baseline SC")
         plt.axhline(y=sil_truth, color='blue', linestyle='dashed', label="Dataset SC")
         plt.legend()

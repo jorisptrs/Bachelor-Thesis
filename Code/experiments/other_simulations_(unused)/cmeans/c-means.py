@@ -235,7 +235,7 @@ def cmeans(X, nb_conceptors, method, limits, aperture, max_epochs=100, plot_prog
         if plot_progress:
             plot.add_new_assignment_plot(new_assignments, "", True)
 
-            # plot.add_new_conceptors_fit_plot(X, ps, "K-means epoch:"+str(epoch)+", C")
+            # plot.add_new_conceptors_fit_plot(X, ps, "GCHC epoch:"+str(epoch)+", C")
         # recompute assignments by find the closest conceptor for each of the state points
         old_assignments = new_assignments.copy()
 
@@ -268,7 +268,7 @@ def experiment(method, limits=[]):
     nrmse_mean = 0
     for trial in range(nb_trials):
         # cluster into as many conceptors as patterns
-        Cs_cmeans, assignments_kmeans = cmeans(X_combined, nb_conceptors=3, method=method, limits=limits,
+        Cs_cmeans, assignments_gchc = cmeans(X_combined, nb_conceptors=3, method=method, limits=limits,
                                                aperture=aperture, max_epochs=100,
                                                plot_progress=(trial == nb_trials - 1))
 
@@ -278,23 +278,23 @@ def experiment(method, limits=[]):
         ### Testing
 
         # Mean combined evidence
-        mce_kmeans = weighted_mean_combined_evidence(X_combined, Cs_cmeans, assignments_kmeans)
+        mce_gchc = weighted_mean_combined_evidence(X_combined, Cs_cmeans, assignments_gchc)
         mce_truth = weighted_mean_combined_evidence(X_truth, Cs_truth, assignments_truth)
-        mce_mean += mce_kmeans
-        mce_delta_mean += (mce_truth - mce_kmeans) / nb_trials
+        mce_mean += mce_gchc
+        mce_delta_mean += (mce_truth - mce_gchc) / nb_trials
 
         # Distance
         sim = max_similarity(Cs_cmeans, Cs_truth)
         sim_mean += sim / nb_trials
 
         # Regeneration
-        p_regen, _ = esn.generate(Cs_cmeans, assignments_kmeans, len(p_combined), fuzzy=True)
+        p_regen, _ = esn.generate(Cs_cmeans, assignments_gchc, len(p_combined), fuzzy=True)
         pp, _ = esn.generate(Cs_truth, assignments_truth, len(p_combined), fuzzy=True)
         nrmse = walking_NRMSE(p_combined, p_regen, 50, 15)
         nrmse_mean += nrmse / nb_trials
 
         if trial == nb_trials - 1:
-            plot.add_new_assignment_plot(assignments_kmeans, "Kmeans assignments to C ")
+            plot.add_new_assignment_plot(assignments_gchc, "GCHC assignments to C ")
             plot.finalize(
                 title='Aperture=' + str(aperture) + ', N=' + str(esn.N) + ', Spec Rad=' + str(esn.spectral_radius))
 

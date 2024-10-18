@@ -10,8 +10,8 @@ from scipy.optimize import linear_sum_assignment
 
 from classifier import Classifier
 from debug import debug_print
-from experiments.exp2_below_phoneme_clustering.kmeans.kmeans import KMeans
-from experiments.exp2_below_phoneme_clustering.kmeans.point import Point
+from experiments.exp2_below_phoneme_clustering.gchc.gchc import GCHC
+from experiments.exp2_below_phoneme_clustering.gchc.point import Point
 
 
 def I(assignments, correct_assignments):

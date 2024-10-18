@@ -156,12 +156,12 @@ p_generated, X_regen = esn.generate(Cs_truth, assignments_fuzzy, t_max, True)
 
 
 #######################################
-# K-means
-def kmeans(X, nb_conceptors, method, limits, aperture, max_epochs=100, plot_progress=False):
+# GCHC
+def gchc(X, nb_conceptors, method, limits, aperture, max_epochs=100, plot_progress=False):
     """
-    Kmeans algorithm, adapted to conceptors
+    GCHC algorithm, adapted to conceptors
     """
-    print("K-means")
+    print("GCHC")
     # Initial assignments and initial conceptors
     nb_points = X.shape[1]
     new_assignments = assign_to_clusters(nb_points, nb_conceptors, method, limits)
@@ -174,7 +174,7 @@ def kmeans(X, nb_conceptors, method, limits, aperture, max_epochs=100, plot_prog
         # ps = optimize_apertures(ps)
 
         if plot_progress:
-            plot.add_new_conceptors_fit_plot(X, Cs, "K-means epoch:" + str(epoch) + ", C")
+            plot.add_new_conceptors_fit_plot(X, Cs, "GCHC epoch:" + str(epoch) + ", C")
         # recompute assignments by find the closest conceptor for each of the state points
         old_assignments = new_assignments.copy()
         new_assignments = [[] for _ in range(nb_conceptors)]
@@ -201,30 +201,30 @@ def experiment(method, limits=[]):
     nrmse_mean = 0
     for trial in range(nb_trials):
         # cluster into as many conceptors as patterns
-        Cs_kmeans, assignments_kmeans = kmeans(X_combined, nb_conceptors=3, method=method, limits=limits,
+        Cs_gchc, assignments_gchc = gchc(X_combined, nb_conceptors=3, method=method, limits=limits,
                                                aperture=aperture, max_epochs=100,
                                                plot_progress=(trial == nb_trials - 1))
 
         ### Testing
 
         # Mean combined evidence
-        mce_kmeans = mean_combined_evidence(X_combined, Cs_kmeans, assignments_kmeans)
+        mce_gchc = mean_combined_evidence(X_combined, Cs_gchc, assignments_gchc)
         mce_truth = mean_combined_evidence(X_truth, Cs_truth, assignments_truth)
-        mce_mean += mce_kmeans
-        mce_delta_mean += (mce_truth - mce_kmeans) / nb_trials
+        mce_mean += mce_gchc
+        mce_delta_mean += (mce_truth - mce_gchc) / nb_trials
 
         # Distance
-        sim = max_similarity(Cs_kmeans, Cs_truth)
+        sim = max_similarity(Cs_gchc, Cs_truth)
         sim_mean += sim / nb_trials
 
         # Regeneration
-        p_regen, _ = esn.generate(Cs_kmeans, assignments_kmeans, len(p_combined))
+        p_regen, _ = esn.generate(Cs_gchc, assignments_gchc, len(p_combined))
         pp, _ = esn.generate(Cs_truth, assignments_truth, len(p_combined))
         nrmse = walking_NRMSE(p_combined, p_regen, 50, 15)
         nrmse_mean += nrmse / nb_trials
 
         if trial == nb_trials - 1:
-            plot.add_new_assignment_plot(assignments_kmeans, "Kmeans assignments to C ", False)
+            plot.add_new_assignment_plot(assignments_gchc, "GCHC assignments to C ", False)
             plot.finalize(
                 title='Aperture=' + str(aperture) + ', N=' + str(esn.N) + ', Spec Rad=' + str(esn.spectral_radius))
 
