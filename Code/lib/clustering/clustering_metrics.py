@@ -114,7 +114,8 @@ def train_and_test_clas(features_train, labels_train, features_test, labels_test
         "n_mels": n_mels,
         "XorZ": "X",
         "N": 100,
-        "cache": False
+        "cache": False,
+        "normalize": False
     })
     return clas.score(features_test, labels_test)
 
